@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Search,
@@ -24,7 +24,10 @@ import {
   ShieldCheck,
   Calendar,
   Building2,
-  Scale
+  Scale,
+  MapPin,
+  Info,
+  ArrowLeft
 } from 'lucide-react';
 import { Language, Scheme } from '../types';
 import { schemesData } from '../data/schemesData';
@@ -35,17 +38,21 @@ interface SchemesViewProps {
   lang: Language;
   savedSchemeIds: string[];
   onToggleSaveScheme: (schemeId: string) => void;
+  onNavigateBack?: () => void;
 }
 
 export const SchemesView: React.FC<SchemesViewProps> = ({
   lang,
   savedSchemeIds,
   onToggleSaveScheme,
+  onNavigateBack,
 }) => {
   const t = translations[lang];
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<'all' | 'grant' | 'loan'>('all');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [selectedSchemeForModal, setSelectedSchemeForModal] = useState<Scheme | null>(null);
 
@@ -55,6 +62,19 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
   const [wizardStatus, setWizardStatus] = useState<string>('homemaker');
   const [wizardIncome, setWizardIncome] = useState<string>('bpl');
   const [wizardResults, setWizardResults] = useState<Scheme[] | null>(null);
+
+  // Ensure scroll is at top when view loads
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
+
+  const governmentLevels = [
+    { id: 'all', label: lang === 'ta' ? 'அனைத்து நிலைகள்' : lang === 'hi' ? 'सभी स्तर' : 'All Levels' },
+    { id: 'central', label: lang === 'ta' ? '🇮🇳 மத்திய அரசு' : lang === 'hi' ? '🇮🇳 केंद्र सरकार' : '🇮🇳 Central Govt' },
+    { id: 'tamil_nadu', label: lang === 'ta' ? '🏛️ தமிழ்நாடு அரசு' : lang === 'hi' ? '🏛️ तमिलनाडु सरकार' : '🏛️ Tamil Nadu' },
+    { id: 'puducherry', label: lang === 'ta' ? '🌴 புதுச்சேரி அரசு' : lang === 'hi' ? '🌴 पुदुचेरी सरकार' : '🌴 Puducherry' },
+    { id: 'other_states', label: lang === 'ta' ? '🗺️ பிற மாநிலங்கள்' : lang === 'hi' ? '🗺️ अन्य राज्य' : '🗺️ Other States' },
+  ];
 
   const categories = [
     { id: 'all', label: t.schemes.catAll },
@@ -73,15 +93,23 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
 
   const filteredSchemes = useMemo(() => {
     return schemesData.filter((scheme) => {
+      // Government level filter
+      if (selectedLevel !== 'all') {
+        if (scheme.governmentLevel !== selectedLevel) return false;
+      }
       // Category match
       if (selectedCategory !== 'all' && scheme.category !== selectedCategory) {
         return false;
       }
+      // Type (grant vs loan) filter
+      if (selectedType === 'grant' && scheme.isLoan) return false;
+      if (selectedType === 'loan' && !scheme.isLoan) return false;
+
       // Saved only match
       if (showSavedOnly && !savedSchemeIds.includes(scheme.id)) {
         return false;
       }
-      // Search query match in all languages
+      // Search query match across languages
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesTitle =
@@ -96,11 +124,15 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
           scheme.department.toLowerCase().includes(query) ||
           scheme.departmentTa.toLowerCase().includes(query) ||
           (scheme.departmentHi && scheme.departmentHi.toLowerCase().includes(query));
-        return matchesTitle || matchesBenefits || matchesDept;
+        const matchesState =
+          scheme.stateOrUt && scheme.stateOrUt.toLowerCase().includes(query);
+        const matchesOffice =
+          scheme.officeOrServiceCenter && scheme.officeOrServiceCenter.toLowerCase().includes(query);
+        return matchesTitle || matchesBenefits || matchesDept || matchesState || matchesOffice;
       }
       return true;
     });
-  }, [selectedCategory, showSavedOnly, searchQuery, savedSchemeIds]);
+  }, [selectedLevel, selectedCategory, selectedType, showSavedOnly, searchQuery, savedSchemeIds]);
 
   const handleSpeakScheme = (scheme: Scheme) => {
     const title = getLocalized(scheme.titleTa, scheme.titleHi, scheme.title);
@@ -155,20 +187,51 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {/* Top Breadcrumb & Back Bar */}
+      <div className="flex items-center justify-between text-xs font-semibold text-stone-600 bg-stone-50 border border-stone-200 rounded-2xl px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          {onNavigateBack && (
+            <button
+              onClick={onNavigateBack}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-stone-300 hover:bg-stone-100 rounded-lg text-stone-800 font-bold transition shadow-2xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{t.common.back}</span>
+            </button>
+          )}
+          <span>{lang === 'ta' ? 'முகப்பு' : lang === 'hi' ? 'होम' : 'Home'}</span>
+          <span>/</span>
+          <span className="text-rose-700 font-bold">{t.nav.schemes}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-[11px] text-stone-500">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span className="hidden sm:inline">
+            {lang === 'ta' ? 'அதிகாரப்பூர்வ அரசு தகவல்கள்' : lang === 'hi' ? 'सत्यापित सरकारी पोर्टल' : 'Official Gazette Grounded'}
+          </span>
+        </div>
+      </div>
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-pink-600 rounded-3xl p-6 sm:p-8 text-white shadow-md">
-        <div className="max-w-2xl">
-          <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-semibold mb-2">
-            {lang === 'ta' ? 'அரசு அங்கீகரித்த திட்டங்கள்' : lang === 'hi' ? 'सरकारी सत्यापित योजनाएं' : 'Government Verified Schemes'}
-          </span>
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold">
+              {lang === 'ta' ? 'அரசு அங்கீகரித்த திட்டங்கள்' : lang === 'hi' ? 'सरकारी सत्यापित योजनाएं' : 'Government Verified Schemes'}
+            </span>
+            <span className="px-2.5 py-1 bg-emerald-500/30 text-emerald-100 rounded-full text-xs font-medium border border-emerald-300/30">
+              {schemesData.length} {lang === 'ta' ? 'திட்டங்கள்' : lang === 'hi' ? 'योजनाएं' : 'Schemes'}
+            </span>
+          </div>
+
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
             {t.schemes.title}
           </h1>
-          <p className="text-xs sm:text-sm text-rose-100 leading-relaxed">
+          <p className="text-xs sm:text-sm text-rose-100 leading-relaxed mb-4">
             {t.schemes.sub}
           </p>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setShowWizard(!showWizard)}
               className="flex items-center gap-2 px-4 py-2.5 bg-amber-400 text-stone-900 hover:bg-amber-300 font-bold text-xs sm:text-sm rounded-full shadow-md transition active:scale-95"
@@ -179,12 +242,27 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
 
             <span className="text-xs text-rose-200">
               {lang === 'ta'
-                ? 'அனைத்து திட்டங்களும் 2025/2026 தமிழ்நாடு & மத்திய அரசு அரசாணைப்படி சரிபார்க்கப்பட்டது'
+                ? 'தமிழ்நாடு, புதுச்சேரி மற்றும் மத்திய அரசு அதிகாரப்பூர்வ தரவுகளின்படி சரிபார்க்கப்பட்டது'
                 : lang === 'hi'
-                ? 'सभी योजनाएं 2025/2026 आधिकारिक सरकारी पोर्टल से सत्यापित हैं'
-                : 'All schemes verified with official gazette sources'}
+                ? 'तमिलनाडु, पुदुचेरी एवं केंद्र सरकार के आधिकारिक पोर्टल से सत्यापित'
+                : 'Central, Tamil Nadu & Puducherry official verified schemes'}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Trust & Transparency Notice */}
+      <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-start gap-3 text-xs text-amber-950">
+        <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <strong className="font-bold">
+            {lang === 'ta' ? 'முக்கிய அறிவிப்பு & வெளிப்படைத்தன்மை:' : lang === 'hi' ? 'पारदर्शिता एवं महत्वपूर्ण सूचना:' : 'Transparency & Official Notice:'}
+          </strong>{' '}
+          {lang === 'ta'
+            ? 'இங்குள்ள திட்டங்கள் அனைத்தும் அதிகாரப்பூர்வ அரசு அறிவிக்கைகள் மற்றும் இணையதளங்கள் அடிப்படையில் சரிபார்க்கப்பட்டவை. SHERISE இடைத்தரகர் அல்ல; எவ்வித கட்டணமும் வசூலிப்பதில்லை. அரசு தகுதி விதிகளுக்கு உட்பட்டு விண்ணப்பங்கள் நேரடியாக அரசு அலுவலகம் அல்லது அதிகாரப்பூர்வ போர்ட்டலில் சமர்ப்பிக்கப்பட வேண்டும்.'
+            : lang === 'hi'
+            ? 'सभी योजनाएं आधिकारिक सरकारी अधिसूचनाओं और पोर्टलों के आधार पर सत्यापित हैं। SHERISE कोई बिचौलिया नहीं है और कोई शुल्क नहीं लेता। आवेदन केवल संबंधित सरकारी कार्यालय या अधिकृत पोर्टल पर ही जमा करें।'
+            : 'All schemes are verified from official government portals and gazettes. SHERISE does not charge any fees or guarantee approvals. Final eligibility and sanctions are strictly determined by the respective government authority.'}
         </div>
       </div>
 
@@ -257,6 +335,9 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
                 </option>
                 <option value="entrepreneur">
                   {lang === 'ta' ? 'சுயஉதவிக்குழு / சிறுதொழில்' : lang === 'hi' ? 'एसएचजी सदस्य / उद्यमी' : 'SHG Member / Entrepreneur'}
+                </option>
+                <option value="student">
+                  {lang === 'ta' ? 'மாணவி (உயர்கல்வி)' : lang === 'hi' ? 'छात्रा (उच्च शिक्षा)' : 'Student (Higher Ed)'}
                 </option>
               </select>
             </div>
@@ -333,10 +414,10 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
         </div>
       )}
 
-      {/* Search & Category Filter Bar */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs space-y-3">
+      {/* Multi-Criteria Filters Container */}
+      <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs space-y-3.5">
+        {/* Search bar & Saved button */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search box */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
@@ -345,10 +426,10 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
                 lang === 'ta'
-                  ? 'திட்டம் பெயர், பயன்கள் அல்லது துறையை தேடுக...'
+                  ? 'திட்டம் பெயர், துறை, மாநிலம், பயன்களை தேடுக...'
                   : lang === 'hi'
-                  ? 'योजना का नाम, लाभ या विभाग खोजें...'
-                  : 'Search schemes by title, keyword, or benefits...'
+                  ? 'योजना का नाम, विभाग, राज्य या लाभ खोजें...'
+                  : 'Search schemes by title, department, state, or keywords...'
               }
               className="w-full pl-9 pr-8 py-2 text-xs border border-stone-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-rose-500"
             />
@@ -363,7 +444,7 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
             )}
           </div>
 
-          {/* Bookmarked / Saved Toggle button */}
+          {/* Bookmarked / Saved Toggle */}
           <button
             onClick={() => setShowSavedOnly(!showSavedOnly)}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition shrink-0 ${
@@ -387,24 +468,85 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
           </button>
         </div>
 
-        {/* Categories horizontal scroll pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1.5 rounded-full font-semibold transition whitespace-nowrap ${
-                  isSelected
-                    ? 'bg-rose-600 text-white shadow-2xs'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
+        {/* Filter Row 1: Government Level */}
+        <div className="space-y-1">
+          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+            {lang === 'ta' ? 'அரசு நிலை / பிராந்தியம்:' : lang === 'hi' ? 'सरकार स्तर / क्षेत्र:' : 'Government Level / Region:'}
+          </span>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {governmentLevels.map((lvl) => {
+              const isSelected = selectedLevel === lvl.id;
+              return (
+                <button
+                  key={lvl.id}
+                  onClick={() => setSelectedLevel(lvl.id)}
+                  className={`px-3 py-1.5 rounded-full font-semibold transition whitespace-nowrap ${
+                    isSelected
+                      ? 'bg-stone-900 text-white shadow-2xs'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  {lvl.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Filter Row 2: Categories */}
+        <div className="space-y-1">
+          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+            {lang === 'ta' ? 'திட்ட வகை:' : lang === 'hi' ? 'योजना श्रेणी:' : 'Scheme Category:'}
+          </span>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {categories.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3 py-1.5 rounded-full font-semibold transition whitespace-nowrap ${
+                    isSelected
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Filter Row 3: Grant vs Loan filter */}
+        <div className="flex items-center gap-2 pt-1 border-t border-stone-100 text-xs">
+          <span className="text-[11px] font-bold text-stone-500">
+            {lang === 'ta' ? 'உதவி முறை:' : lang === 'hi' ? 'सहायता प्रकार:' : 'Type:'}
+          </span>
+          <button
+            onClick={() => setSelectedType('all')}
+            className={`px-2.5 py-1 rounded-lg font-medium transition ${
+              selectedType === 'all' ? 'bg-stone-800 text-white' : 'text-stone-600 hover:bg-stone-100'
+            }`}
+          >
+            {lang === 'ta' ? 'அனைத்தும்' : lang === 'hi' ? 'सभी' : 'All'}
+          </button>
+          <button
+            onClick={() => setSelectedType('grant')}
+            className={`px-2.5 py-1 rounded-lg font-medium transition ${
+              selectedType === 'grant' ? 'bg-emerald-600 text-white' : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100'
+            }`}
+          >
+            {lang === 'ta' ? '✨ இலவச மானியம் மட்டும்' : lang === 'hi' ? '✨ केवल मुफ्त अनुदान' : '✨ Grants Only'}
+          </button>
+          <button
+            onClick={() => setSelectedType('loan')}
+            className={`px-2.5 py-1 rounded-lg font-medium transition ${
+              selectedType === 'loan' ? 'bg-amber-600 text-white' : 'text-amber-800 bg-amber-50 hover:bg-amber-100'
+            }`}
+          >
+            {lang === 'ta' ? '🔄 தொழிற்கடன் மட்டும்' : lang === 'hi' ? '🔄 केवल ऋण' : '🔄 Loans Only'}
+          </button>
         </div>
       </div>
 
@@ -417,6 +559,7 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
           const benefits = getLocalized(scheme.benefitsTa, scheme.benefitsHi, scheme.benefits);
           const badge = getLocalized(scheme.badgeTa, scheme.badgeHi, scheme.badge);
           const eligibilityList = lang === 'ta' ? scheme.eligibilityTa : lang === 'hi' && scheme.eligibilityHi ? scheme.eligibilityHi : scheme.eligibility;
+          const office = getLocalized(scheme.officeOrServiceCenterTa, scheme.officeOrServiceCenterHi, scheme.officeOrServiceCenter);
 
           return (
             <div
@@ -424,17 +567,22 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
               className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between space-y-4"
             >
               <div>
-                {/* Header row: Department & Save button */}
+                {/* Header row: Grant vs Loan & Region Pill */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {/* Loan vs Grant Pill */}
                     {scheme.isLoan ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
                         {lang === 'ta' ? '🔄 திருப்பிச் செலுத்த வேண்டிய கடன்' : lang === 'hi' ? '🔄 पुनर्भुगतान योग्य ऋण' : '🔄 Repayable Loan'}
                       </span>
                     ) : (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
-                        {lang === 'ta' ? '✨ இலவச மானிய உதவி' : lang === 'hi' ? '✨ निःशुल्क अनुदान' : '✨ Non-Repayable Grant'}
+                        {lang === 'ta' ? '✨ 100% இலவச மானியம்' : lang === 'hi' ? '✨ 100% मुफ्त अनुदान' : '✨ 100% Free Grant'}
+                      </span>
+                    )}
+
+                    {scheme.stateOrUt && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        📍 {scheme.stateOrUt}
                       </span>
                     )}
 
@@ -480,8 +628,8 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
                 </h3>
 
                 <p className="text-[11px] text-stone-600 font-medium mb-3 flex items-center gap-1">
-                  <Building2 className="w-3 h-3 text-stone-400" />
-                  <span>{dept}</span>
+                  <Building2 className="w-3 h-3 text-stone-400 shrink-0" />
+                  <span className="line-clamp-1">{dept}</span>
                 </p>
 
                 {/* Benefits Banner */}
@@ -494,6 +642,19 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
                     {benefits}
                   </p>
                 </div>
+
+                {/* Where to Apply Office Callout */}
+                {office && (
+                  <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-[11px] text-stone-700 mb-3 flex items-start gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-semibold text-stone-900">
+                        {lang === 'ta' ? 'விண்ணப்பிக்கும் இடம்:' : lang === 'hi' ? 'आवेदन का स्थान:' : 'Where to Apply:'}
+                      </strong>{' '}
+                      {office}
+                    </div>
+                  </div>
+                )}
 
                 {/* Eligibility preview */}
                 <div className="space-y-1">
@@ -510,16 +671,13 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
                   </ul>
                 </div>
 
-                {/* Verification date & Source info */}
+                {/* Verification Date */}
                 {scheme.verificationDate && (
                   <div className="mt-3 flex items-center gap-2 text-[10px] text-stone-400">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-emerald-600" />
                       <span>{lang === 'ta' ? 'சரிபார்க்கப்பட்டது:' : lang === 'hi' ? 'सत्यापित:' : 'Verified:'} {scheme.verificationDate}</span>
                     </span>
-                    {(scheme.sourceName || scheme.officialSource) && (
-                      <span>• {scheme.sourceName || scheme.officialSource}</span>
-                    )}
                   </div>
                 )}
               </div>
@@ -569,12 +727,14 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
           <button
             onClick={() => {
               setSearchQuery('');
+              setSelectedLevel('all');
               setSelectedCategory('all');
+              setSelectedType('all');
               setShowSavedOnly(false);
             }}
             className="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold"
           >
-            {lang === 'ta' ? 'அனைத்து திட்டங்களையும் காட்டு' : lang === 'hi' ? 'सभी योजनाएं दिखाएं' : 'Reset Filters'}
+            {lang === 'ta' ? 'அனைத்து வடிகட்டிகளையும் நீக்கு' : lang === 'hi' ? 'फ़िल्टर रीसेट करें' : 'Reset All Filters'}
           </button>
         </div>
       )}
@@ -590,19 +750,21 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-stone-100 pb-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
                   {selectedSchemeForModal.isLoan ? (
                     <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
                       {lang === 'ta' ? '🔄 திருப்பிச் செலுத்த வேண்டிய கடன் (Repayable Loan)' : lang === 'hi' ? '🔄 पुनर्भुगतान योग्य ऋण' : '🔄 Repayable Loan'}
                     </span>
                   ) : (
                     <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
-                      {lang === 'ta' ? '✨ இலவச மானிய உதவி (Non-Repayable Aid)' : lang === 'hi' ? '✨ निःशुल्क अनुदान' : '✨ Non-Repayable Grant'}
+                      {lang === 'ta' ? '✨ 100% இலவச மானிய உதவி (Non-Repayable Grant)' : lang === 'hi' ? '✨ 100% निःशुल्क अनुदान' : '✨ 100% Non-Repayable Grant'}
                     </span>
                   )}
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800">
-                    {getLocalized(selectedSchemeForModal.badgeTa, selectedSchemeForModal.badgeHi, selectedSchemeForModal.badge || 'Govt Scheme')}
-                  </span>
+                  {selectedSchemeForModal.stateOrUt && (
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900">
+                      📍 {selectedSchemeForModal.stateOrUt}
+                    </span>
+                  )}
                 </div>
 
                 <h2 className="text-xl font-extrabold text-stone-900 leading-snug">
@@ -622,14 +784,14 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
               </button>
             </div>
 
-            {/* Read Aloud trigger in modal */}
+            {/* Read Aloud button in modal */}
             <div className="flex items-center justify-between p-3 bg-rose-50 rounded-2xl border border-rose-200 text-xs">
               <span className="font-semibold text-rose-900">
                 {lang === 'ta'
-                  ? 'இந்த முழு விவரங்களையும் வாசித்து கேட்க விரும்புகிறீர்களா?'
+                  ? 'இந்த திட்ட விவரங்களை தமிழில் வாசித்து கேட்க விரும்புகிறீர்களா?'
                   : lang === 'hi'
-                  ? 'क्या आप यह पूरा विवरण सुनना चाहते हैं?'
-                  : 'Would you like to listen to these complete instructions?'}
+                  ? 'क्या आप इस योजना का विवरण सुनना चाहती हैं?'
+                  : 'Would you like to listen to these scheme instructions?'}
               </span>
               <button
                 onClick={() => handleSpeakScheme(selectedSchemeForModal)}
@@ -641,18 +803,35 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
             </div>
 
             {/* Official Source & Verification Pill */}
-            {selectedSchemeForModal.verificationDate && (
-              <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 text-stone-600">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs space-y-1.5 text-stone-600">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>{lang === 'ta' ? 'அதிகாரப்பூர்வ துறை:' : lang === 'hi' ? 'आधिकारिक विभाग:' : 'Official Authority:'}</strong>{' '}
+                  {selectedSchemeForModal.sourceName || selectedSchemeForModal.officialSource}
+                </span>
+              </div>
+              <div className="text-[11px] text-stone-500 pl-5">
+                {lang === 'ta' ? 'சரிபார்க்கப்பட்ட நிலை: 2026 அரசு அரசிதழ் / அதிகாரப்பூர்வ இணையதளம்' : lang === 'hi' ? 'सत्यापन स्थिति: 2026 आधिकारिक गजट' : 'Verification Status: 2026 Official Gazette / Verified Web Portal'}
+              </div>
+            </div>
+
+            {/* Where to apply location guidance */}
+            {selectedSchemeForModal.officeOrServiceCenter && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-950 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                  <MapPin className="w-4 h-4 text-blue-600" />
                   <span>
-                    <strong>{lang === 'ta' ? 'அதிகாரப்பூர்வ ஆதாரம்:' : lang === 'hi' ? 'आधिकारिक स्रोत:' : 'Official Source:'}</strong>{' '}
-                    {selectedSchemeForModal.sourceName || selectedSchemeForModal.officialSource || 'Government Gazette / Portal'}
+                    {lang === 'ta' ? 'விண்ணப்பிக்க அணுக வேண்டிய அரசு அலுவலகம் / மையம்:' : lang === 'hi' ? 'आवेदन हेतु संपर्क केंद्र / सरकारी कार्यालय:' : 'Where to Apply (Office / Service Center):'}
                   </span>
-                </span>
-                <span className="text-[11px] text-stone-500">
-                  {lang === 'ta' ? 'சரிபார்க்கப்பட்ட தேதி:' : lang === 'hi' ? 'सत्यापन तिथि:' : 'Verified:'} {selectedSchemeForModal.verificationDate}
-                </span>
+                </div>
+                <p className="pl-5 leading-relaxed font-medium">
+                  {getLocalized(
+                    selectedSchemeForModal.officeOrServiceCenterTa,
+                    selectedSchemeForModal.officeOrServiceCenterHi,
+                    selectedSchemeForModal.officeOrServiceCenter
+                  )}
+                </p>
               </div>
             )}
 

@@ -85,13 +85,72 @@ export default function App() {
     }
   };
 
-  // 3. Active View Tab
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  // 3. Active View Tab & Navigation Stack
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    try {
+      const hash = window.location.hash.replace('#', '') as ActiveTab;
+      if (hash) return hash;
+    } catch {
+      // ignore
+    }
+    return 'dashboard';
+  });
+  const [navHistory, setNavHistory] = useState<ActiveTab[]>(['dashboard']);
   const [chatInitialContactId, setChatInitialContactId] = useState<string | undefined>(undefined);
+
+  // Sync scroll to top on every view switch
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [activeTab]);
+
+  // Handle browser back and forward buttons
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.tab) {
+        setActiveTab(e.state.tab as ActiveTab);
+      } else {
+        const hash = window.location.hash.replace('#', '') as ActiveTab;
+        if (hash) {
+          setActiveTab(hash);
+        } else {
+          setActiveTab('dashboard');
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleNavigate = (targetTab: ActiveTab) => {
+    if (targetTab !== activeTab) {
+      setNavHistory((prev) => [...prev, activeTab]);
+      try {
+        window.history.pushState({ tab: targetTab }, '', `#${targetTab}`);
+      } catch {
+        // ignore
+      }
+      setActiveTab(targetTab);
+    }
+  };
+
+  const handleNavigateBack = () => {
+    if (navHistory.length > 0) {
+      const previous = navHistory[navHistory.length - 1];
+      setNavHistory((prev) => prev.slice(0, prev.length - 1));
+      try {
+        window.history.pushState({ tab: previous }, '', `#${previous}`);
+      } catch {
+        // ignore
+      }
+      setActiveTab(previous);
+    } else {
+      handleNavigate('dashboard');
+    }
+  };
 
   const handleOpenChatWithTrainer = (trainerContactId: string) => {
     setChatInitialContactId(trainerContactId);
-    setActiveTab('chat-call');
+    handleNavigate('chat-call');
   };
 
   // 4. Accessibility Font Size
@@ -354,7 +413,7 @@ export default function App() {
         lang={lang}
         onLanguageChange={handleLanguageChange}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleNavigate}
         isSpeaking={isSpeaking}
         onToggleSpeakPage={handleToggleSpeakPage}
         isListeningVoice={isListeningVoice}
@@ -378,7 +437,7 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <DashboardView
             lang={lang}
-            onNavigate={setActiveTab}
+            onNavigate={handleNavigate}
             savedSchemesCount={savedSchemeIds.length}
             userProfile={userProfile}
           />
@@ -405,15 +464,21 @@ export default function App() {
             lang={lang}
             savedSchemeIds={savedSchemeIds}
             onToggleSaveScheme={handleToggleSaveScheme}
+            onNavigateBack={handleNavigateBack}
           />
         )}
 
-        {activeTab === 'education' && <EducationView lang={lang} />}
+        {activeTab === 'education' && (
+          <EducationView
+            lang={lang}
+            onNavigateBack={handleNavigateBack}
+          />
+        )}
 
         {activeTab === 'skills' && (
           <SkillsIncomeView
             lang={lang}
-            onNavigateToBusinessGenerator={() => setActiveTab('business-generator')}
+            onNavigateToBusinessGenerator={() => handleNavigate('business-generator')}
           />
         )}
 
@@ -425,14 +490,20 @@ export default function App() {
           <BudgetCalculatorView lang={lang} />
         )}
 
-        {activeTab === 'community' && <CommunityView lang={lang} />}
+        {activeTab === 'community' && (
+          <CommunityView
+            lang={lang}
+            userProfile={userProfile}
+            onNavigateBack={handleNavigateBack}
+          />
+        )}
 
         {activeTab === 'profile' && (
           <ProfileView
             lang={lang}
             userProfile={userProfile}
             onUpdateProfile={handleUpdateUserProfile}
-            onNavigate={setActiveTab}
+            onNavigate={handleNavigate}
           />
         )}
 
@@ -453,7 +524,7 @@ export default function App() {
         className="lg:hidden sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-rose-200 px-2 py-2 flex items-center justify-around text-[10px] font-bold text-stone-600 shadow-lg"
       >
         <button
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => handleNavigate('dashboard')}
           className={`flex flex-col items-center gap-1 p-1 rounded-lg ${
             activeTab === 'dashboard' ? 'text-rose-600' : 'hover:text-rose-600'
           }`}
@@ -463,7 +534,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('emergency-help')}
+          onClick={() => handleNavigate('emergency-help')}
           className={`flex flex-col items-center gap-1 p-1 rounded-lg text-rose-700 font-extrabold ${
             activeTab === 'emergency-help' ? 'bg-rose-100 rounded-xl' : ''
           }`}
@@ -473,7 +544,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('schemes')}
+          onClick={() => handleNavigate('schemes')}
           className={`flex flex-col items-center gap-1 p-1 rounded-lg ${
             activeTab === 'schemes' ? 'text-rose-600' : 'hover:text-rose-600'
           }`}
@@ -483,7 +554,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('skills-learning')}
+          onClick={() => handleNavigate('skills-learning')}
           className={`flex flex-col items-center gap-1 p-1 rounded-lg ${
             activeTab === 'skills-learning' ? 'text-rose-600' : 'hover:text-rose-600'
           }`}
@@ -493,7 +564,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('chat-call')}
+          onClick={() => handleNavigate('chat-call')}
           className={`flex flex-col items-center gap-1 p-1 rounded-lg ${
             activeTab === 'chat-call' ? 'text-rose-600' : 'hover:text-rose-600'
           }`}
@@ -503,7 +574,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab('profile')}
+          onClick={() => handleNavigate('profile')}
           className={`flex flex-col items-center gap-1 p-1 rounded-lg ${
             activeTab === 'profile' ? 'text-rose-600' : 'hover:text-rose-600'
           }`}
@@ -523,7 +594,7 @@ export default function App() {
                 size="sm"
                 variant="light"
                 showTagline={true}
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => handleNavigate('dashboard')}
               />
               <p className="text-stone-400 leading-relaxed text-[11px]">
                 {t.appSubtitle}
@@ -542,7 +613,7 @@ export default function App() {
               <ul className="space-y-1.5 text-stone-400 text-[11px]">
                 <li>
                   <button
-                    onClick={() => setActiveTab('emergency-help')}
+                    onClick={() => handleNavigate('emergency-help')}
                     className="hover:text-rose-400 transition font-bold text-rose-300"
                   >
                     🚨 {t.nav.emergencyHelp}
@@ -550,7 +621,7 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setActiveTab('schemes')}
+                    onClick={() => handleNavigate('schemes')}
                     className="hover:text-rose-400 transition"
                   >
                     {t.nav.schemes}
@@ -558,7 +629,7 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setActiveTab('skills-learning')}
+                    onClick={() => handleNavigate('skills-learning')}
                     className="hover:text-rose-400 transition"
                   >
                     {t.nav.skillsLearning}
@@ -566,7 +637,23 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setActiveTab('chat-call')}
+                    onClick={() => handleNavigate('education')}
+                    className="hover:text-rose-400 transition"
+                  >
+                    {t.nav.education}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handleNavigate('community')}
+                    className="hover:text-rose-400 transition"
+                  >
+                    {t.nav.community}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handleNavigate('chat-call')}
                     className="hover:text-rose-400 transition"
                   >
                     {t.nav.chatCall}
@@ -574,7 +661,7 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setActiveTab('profile')}
+                    onClick={() => handleNavigate('profile')}
                     className="hover:text-rose-400 transition"
                   >
                     {t.nav.profile}

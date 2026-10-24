@@ -76,6 +76,12 @@ export interface Scheme {
   badge?: string;
   badgeTa?: string;
   badgeHi?: string;
+  governmentLevel?: 'central' | 'tamil_nadu' | 'puducherry' | 'other_states';
+  stateOrUt?: string;
+  officeOrServiceCenter?: string;
+  officeOrServiceCenterTa?: string;
+  officeOrServiceCenterHi?: string;
+  lastCheckedDate?: string;
 }
 
 export interface EducationOpportunity {
@@ -182,6 +188,7 @@ export interface BudgetItemPlan {
 
 export interface CommunityPost {
   id: string;
+  authorId?: string;
   authorName: string;
   authorLocation: string;
   role: string;

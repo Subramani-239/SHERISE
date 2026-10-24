@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   GraduationCap,
   BookOpen,
@@ -16,436 +16,751 @@ import {
   HelpCircle,
   Clock,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft,
+  CheckSquare,
+  Square,
+  AlertCircle,
+  FileCheck,
+  Award,
+  Compass
 } from 'lucide-react';
-import { Language, EducationOpportunity } from '../types';
-import { educationData } from '../data/educationData';
+import { Language } from '../types';
 import { translations } from '../data/translations';
 import { speakText } from '../utils/speech';
+import {
+  EducationStage,
+  LearnerGoal,
+  generateEducationRoadmap,
+  verificationChecklist,
+  RoadmapStep
+} from '../utils/educationRoadmap';
+import confetti from 'canvas-confetti';
 
 interface EducationViewProps {
   lang: Language;
+  onNavigateBack?: () => void;
 }
 
-export const EducationView: React.FC<EducationViewProps> = ({ lang }) => {
+export const EducationView: React.FC<EducationViewProps> = ({ lang, onNavigateBack }) => {
   const t = translations[lang];
-  const [selectedCourse, setSelectedCourse] = useState<EducationOpportunity | null>(null);
-  const [activeTab, setActiveTab] = useState<'re-enroll' | 'digital-safety' | 'courses'>('re-enroll');
+
+  // Scroll to top cleanly on mount
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<'roadmap' | 'verification' | 'directory' | 'digital-safety'>('roadmap');
+
+  // Intake State
+  const [selectedStage, setSelectedStage] = useState<EducationStage>('discontinued_11_12');
+  const [selectedGoal, setSelectedGoal] = useState<LearnerGoal>('formal_degree');
+  const [studyTime, setStudyTime] = useState<string>('1-2');
+  const [studyMode, setStudyMode] = useState<string>('home_distance');
+
+  // Completed Steps State (stored in localStorage)
+  const [completedStepIds, setCompletedStepIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sherise_education_progress');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  const toggleStepCompleted = (stepId: string) => {
+    setCompletedStepIds((prev) => {
+      const exists = prev.includes(stepId);
+      const next = exists ? prev.filter((id) => id !== stepId) : [...prev, stepId];
+      try {
+        localStorage.setItem('sherise_education_progress', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      if (!exists) {
+        try {
+          confetti({ particleCount: 25, spread: 45 });
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  };
+
+  const roadmapData = generateEducationRoadmap(selectedStage, selectedGoal, lang);
+
+  const stagesList: { id: EducationStage; labelEn: string; labelTa: string; labelHi: string }[] = [
+    {
+      id: 'completed_10th',
+      labelEn: 'Passed Class 10 (Want +2, Diploma or Career)',
+      labelTa: '10-ஆம் வகுப்பு முடித்தேன் (+2, டிப்ளமோ அல்லது வேலை)',
+      labelHi: '10वीं उत्तीर्ण (12वीं, डिप्लोमा या करियर चाहते हैं)'
+    },
+    {
+      id: 'discontinued_11_12',
+      labelEn: 'Discontinued in Class 11 or 12',
+      labelTa: '11 அல்லது 12-ஆம் வகுப்பில் படிப்பை நிறுத்தினேன்',
+      labelHi: '11वीं या 12वीं में पढ़ाई छूट गई'
+    },
+    {
+      id: 'completed_12th',
+      labelEn: 'Passed Class 12 (+2 Completed, Want Degree)',
+      labelTa: '12-ஆம் வகுப்பு முடித்தேன் (+2 தேர்ச்சி, பட்டம் தேவை)',
+      labelHi: '12वीं उत्तीर्ण (कॉलेज डिग्री या कौशल चाहते हैं)'
+    },
+    {
+      id: 'college_discontinued',
+      labelEn: 'Started College but Discontinued (1st / 2nd Year)',
+      labelTa: 'கல்லூரியில் சேர்ந்து 1 அல்லது 2-ஆம் ஆண்டில் நின்றேன்',
+      labelHi: 'कॉलेज शुरू किया किंतु बीच में छूट गया (पहला/दूसरा वर्ष)'
+    },
+    {
+      id: 'college_some_semesters',
+      labelEn: 'Completed Some Semesters / Have Pending Papers',
+      labelTa: 'சில செமஸ்டர்கள் முடித்தேன் / அரியர் பாடங்கள் உள்ளன',
+      labelHi: 'कुछ सेमेस्टर पूरे किए / बैक पेपर बाकी हैं'
+    },
+    {
+      id: 'graduate_skill_upgrade',
+      labelEn: 'Already Graduated, Need Job-Ready Skills',
+      labelTa: 'பட்டம் முடித்தேன், உடனடி வருமான திறன் தேவை',
+      labelHi: 'स्नातक पूरा किया, रोजगार कौशल चाहिए'
+    },
+    {
+      id: 'unsure_next',
+      labelEn: 'Unsure What to Study Next (Need Guidance)',
+      labelTa: 'அடுத்து என்ன படிப்பது என்று தெளிவாக தெரியவில்லை',
+      labelHi: 'आगे क्या पढ़ें यह तय नहीं है (मार्गदर्शन चाहिए)'
+    }
+  ];
+
+  const getLocalized = (ta?: string, hi?: string, en?: string): string => {
+    if (lang === 'ta' && ta) return ta;
+    if (lang === 'hi' && hi) return hi;
+    return en || ta || '';
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {/* Top Breadcrumb & Back Bar */}
+      <div className="flex items-center justify-between text-xs font-semibold text-stone-600 bg-stone-50 border border-stone-200 rounded-2xl px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          {onNavigateBack && (
+            <button
+              onClick={onNavigateBack}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-stone-300 hover:bg-stone-100 rounded-lg text-stone-800 font-bold transition shadow-2xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{t.common.back}</span>
+            </button>
+          )}
+          <span>{lang === 'ta' ? 'முகப்பு' : lang === 'hi' ? 'होम' : 'Home'}</span>
+          <span>/</span>
+          <span className="text-emerald-700 font-bold">{t.nav.education}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-[11px] text-stone-500">
+          <GraduationCap className="w-4 h-4 text-emerald-600" />
+          <span>
+            {lang === 'ta' ? 'இரண்டாம் வாய்ப்பு & திறந்தநிலைக் கல்வி' : lang === 'hi' ? 'द्वितीय अवसर एवं मुक्त शिक्षा' : 'Second Chances & Open Education'}
+          </span>
+        </div>
+      </div>
+
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 rounded-3xl p-6 sm:p-8 text-white shadow-md">
-        <div className="max-w-2xl">
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-cyan-800 rounded-3xl p-6 sm:p-8 text-white shadow-md">
+        <div className="max-w-3xl">
           <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-semibold mb-2">
-            {lang === 'ta' ? 'இரண்டாம் வாய்ப்பு & முன்னேற்றம்' : 'Second Chances & Lifelong Learning'}
+            {lang === 'ta' ? 'கல்வியை மீண்டும் தொடங்கும் வழிகாட்டி' : lang === 'hi' ? 'शिक्षा पुनः शुरुआत संपूर्ण मार्गदर्शिका' : 'Education Restart & Recovery Guide'}
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2">
             {t.education.title}
           </h1>
-          <p className="text-xs sm:text-sm text-emerald-100 leading-relaxed">
+          <p className="text-xs sm:text-sm text-emerald-100 leading-relaxed mb-4">
             {t.education.sub}
           </p>
 
-          <div className="mt-5 flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() =>
                 speakText(
                   lang === 'ta'
-                    ? 'கல்வி வாய்ப்புகள் பகுதி. நீங்கள் குடும்பச் சூழலால் 6, 7 அல்லது 8-ஆம் வகுப்போடு படிப்பை நிறுத்தியிருந்தாலும், வீட்டில் இருந்தபடியே தேசிய திறந்தநிலைப் பள்ளி மூலம் 10-ஆம் வகுப்பு முடிக்கலாம். மேலும் டிஜிட்டல் பாதுகாப்பு வழிகாட்டிகளும் உள்ளன.'
-                    : 'Education Opportunities. Complete your 10th standard or college degree from home through open universities without attending regular classes.',
+                    ? 'கல்வி மறுதொடக்க வழிகாட்டி. நீங்கள் 10-ஆம் வகுப்பிற்குப் பின் நின்றிருந்தாலும், அல்லது கல்லூரியை பாதியில் நிறுத்தியிருந்தாலும், வீட்டில் இருந்தே தேசிய திறந்தநிலைப் பள்ளி மற்றும் தொலைதூர பல்கலைக்கழகங்கள் மூலம் படிப்பை முடிக்கலாம். உங்களின் முந்தைய மதிப்பெண்களை டிரான்ஸ்பர் செய்யும் வாய்ப்பும் உண்டு.'
+                    : lang === 'hi'
+                    ? 'शिक्षा पुनः शुरुआत मार्गदर्शन। यदि आपकी पढ़ाई 10वीं, 12वीं या कॉलेज में छूट गई थी, तो आप घर बैठे एनआईओएस और मुक्त विश्वविद्यालयों के माध्यम से अपनी डिग्री पूरी कर सकती हैं।'
+                    : 'Education Restart Guidance. Complete your 10th, 12th or college degree at your own pace from home with recognized government open universities.',
                   lang
                 )
               }
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-emerald-800 hover:bg-emerald-50 rounded-full font-bold text-xs transition shadow-xs"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-emerald-900 hover:bg-emerald-50 rounded-full font-bold text-xs transition shadow-xs"
             >
               <Volume2 className="w-4 h-4 text-emerald-700" />
               <span>{t.common.listen}</span>
             </button>
+
+            <span className="text-xs text-emerald-200">
+              {lang === 'ta'
+                ? 'வயது வரம்பில்லை • அசல் TC தேவையில்லை • அரசு தேர்வு சான்றிதழ் சமம்'
+                : lang === 'hi'
+                ? 'कोई आयु सीमा नहीं • टीसी की बाध्यता नहीं • सरकारी डिग्री समान मान्य'
+                : 'No age barrier • Direct self-declaration • 100% Govt Recognized'}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Nav pill tabs */}
+      {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-stone-200 pb-2 overflow-x-auto no-scrollbar">
         <button
-          onClick={() => setActiveTab('re-enroll')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
-            activeTab === 're-enroll'
-              ? 'bg-emerald-600 text-white shadow-xs'
+          onClick={() => setActiveTab('roadmap')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
+            activeTab === 'roadmap'
+              ? 'bg-emerald-700 text-white shadow-xs'
               : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
           }`}
         >
-          {lang === 'ta' ? 'படிப்பை மீண்டும் தொடங்கும் முறை' : 'Restarting Studies Guide'}
+          <Compass className="w-4 h-4" />
+          <span>{lang === 'ta' ? 'எனக்கான மறுதொடக்க திட்டம் (Roadmap)' : lang === 'hi' ? 'मेरा रोडमैप (Roadmap)' : 'My Restart Roadmap'}</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('courses')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
-            activeTab === 'courses'
-              ? 'bg-emerald-600 text-white shadow-xs'
+          onClick={() => setActiveTab('verification')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
+            activeTab === 'verification'
+              ? 'bg-emerald-700 text-white shadow-xs'
               : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
           }`}
         >
-          {lang === 'ta' ? 'படிப்பு & சான்றிதழ் விவரங்கள்' : 'Open Courses & Degrees'}
+          <ShieldCheck className="w-4 h-4" />
+          <span>{lang === 'ta' ? 'சேரும் முன் சரிபார்க்க வேண்டியவை (மோசடி எச்சரிக்கை)' : lang === 'hi' ? 'दाखिला पूर्व जांच व धोखाधड़ी से बचाव' : 'Before You Choose a Course'}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('directory')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
+            activeTab === 'directory'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>{lang === 'ta' ? 'அரசு திறந்தநிலைப் படிப்புகள் & சான்றிதழ்கள்' : lang === 'hi' ? 'सरकारी मुक्त पाठ्यक्रम व डिग्री' : 'Open Programs & Degree Directory'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('digital-safety')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
+          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition whitespace-nowrap ${
             activeTab === 'digital-safety'
-              ? 'bg-emerald-600 text-white shadow-xs'
+              ? 'bg-emerald-700 text-white shadow-xs'
               : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
           }`}
         >
-          {lang === 'ta' ? 'ஸ்மார்ட்போன் & UPI பாதுகாப்பு' : 'Smartphone & UPI Safety'}
+          <Smartphone className="w-4 h-4" />
+          <span>{lang === 'ta' ? 'ஸ்மார்ட்போன் & டிஜிலாக்கர் பாதுகாப்பு' : lang === 'hi' ? 'स्मार्टफोन व डिजिलॉकर सुरक्षा' : 'Smartphone & DigiLocker Safety'}</span>
         </button>
       </div>
 
-      {/* Tab 1: Re-enrollment Roadmap for Dropouts */}
-      {activeTab === 're-enroll' && (
-        <div className="space-y-5 animate-fadeIn">
-          <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-2xs space-y-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-stone-900">
-                  {t.education.reEnrollmentGuideTitle}
-                </h2>
-                <p className="text-xs text-stone-500 mt-1">
-                  {lang === 'ta'
-                    ? '10 அல்லது 20 ஆண்டுகளுக்கு முன் படிப்பை நிறுத்தியிருந்தாலும் தயங்க வேண்டாம்; அரசு சட்டப்படி உங்களுக்கு கல்வி உரிமை உண்டு.'
-                    : 'Even if you discontinued 10 or 20 years ago, Indian open schooling laws guarantee your right to complete board examinations.'}
-                </p>
-              </div>
-              <button
-                onClick={() =>
-                  speakText(
-                    lang === 'ta'
-                      ? 'படிப்பை மீண்டும் தொடங்குவது எப்படி? படி 1: முந்தைய பள்ளி சான்றிதழ் இல்லை என்றாலும் சுய உறுதிமொழி மூலம் NIOS 10-ஆம் வகுப்பில் நேரடியாக சேரலாம். படி 2: வீட்டில் இருந்தே படிக்கலாம். படி 3: எளிதான 5 பாடங்களை தேர்வு செய்து தேர்ச்சி பெறலாம்.'
-                      : 'How to restart education: Step 1, apply directly to NIOS even without previous TC. Step 2, study from home with Tamil textbooks. Step 3, write exams in flexible installments.',
-                    lang
-                  )
-                }
-                className="p-2 text-stone-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition"
-                aria-label="Listen"
-              >
-                <Volume2 className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* 4 Step Timeline */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">
-                    1
-                  </span>
-                  <h3 className="text-xs font-bold text-emerald-950">
-                    {lang === 'ta' ? 'சான்றிதழ் இல்லை என்றாலும் சேரலாம்' : 'No TC? Direct Self-Declaration'}
-                  </h3>
-                </div>
-                <p className="text-xs text-emerald-900 leading-relaxed">
-                  {lang === 'ta'
-                    ? 'பழைய பள்ளி டிசி (TC) தொலைந்து விட்டதா? கவலை வேண்டாம்! உங்கள் ஆதார் அட்டை மற்றும் வயது சான்றிதழை (14 வயதுக்கு மேல்) கொண்டு தேசிய திறந்தநிலை பள்ளியில் (NIOS) நேரடியாக 10-ஆம் வகுப்பில் சேரலாம்.'
-                    : 'If your old school Transfer Certificate is misplaced, you can enroll directly in NIOS 10th standard based on an age certificate and Aadhaar self-declaration.'}
-                </p>
-              </div>
-
-              <div className="p-4 bg-teal-50/70 border border-teal-200 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center">
-                    2
-                  </span>
-                  <h3 className="text-xs font-bold text-teal-950">
-                    {lang === 'ta' ? 'எளிய 5 பாடங்கள் தேர்வு' : 'Choose 5 Friendly Subjects'}
-                  </h3>
-                </div>
-                <p className="text-xs text-teal-900 leading-relaxed">
-                  {lang === 'ta'
-                    ? 'கடினமான கணிதம் அல்லது அறிவியலுக்கு பதில், தமிழ், ஆங்கிலம், மனையியல் (Home Science), ஓவியக் கலை (Painting), மற்றும் கம்ப்யூட்டர் தரவு பதிவு (Data Entry) போன்ற எளிய நடைமுறை பாடங்களை தேர்வு செய்யலாம்.'
-                    : 'Instead of difficult calculus, choose practical scoring subjects like Tamil/English, Home Science, Data Entry, and Painting.'}
-                </p>
-              </div>
-
-              <div className="p-4 bg-cyan-50/70 border border-cyan-200 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-cyan-600 text-white text-xs font-bold flex items-center justify-center">
-                    3
-                  </span>
-                  <h3 className="text-xs font-bold text-cyan-950">
-                    {lang === 'ta' ? 'இலவச பாடப்புத்தகங்கள் & வீட்டு கற்றல்' : 'Free Textbooks Delivered to Home'}
-                  </h3>
-                </div>
-                <p className="text-xs text-cyan-900 leading-relaxed">
-                  {lang === 'ta'
-                    ? 'பதிவு செய்தவுடன் அரசு எளிய தமிழ் வழியில் அச்சிடப்பட்ட புத்தகங்களை உங்கள் வீட்டிற்கே தபாலில் அனுப்பும். தினமும் பள்ளி செல்ல வேண்டிய அவசியமில்லை; ஓய்வு நேரத்தில் வீட்டில் படிக்கலாம்.'
-                    : 'Comprehensive Tamil/English textbooks are mailed directly to your address. Study at your own pace during afternoon household leisure hours.'}
-                </p>
-              </div>
-
-              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-amber-600 text-white text-xs font-bold flex items-center justify-center">
-                    4
-                  </span>
-                  <h3 className="text-xs font-bold text-amber-950">
-                    {lang === 'ta' ? 'தவணை முறையில் தேர்வு எழுதும் வசதி' : 'Write Exams in Easy Installments'}
-                  </h3>
-                </div>
-                <p className="text-xs text-amber-900 leading-relaxed">
-                  {lang === 'ta'
-                    ? 'ஒரே நேரத்தில் 5 பாடங்களையும் எழுத வேண்டிய கட்டாயமில்லை! இந்த ஆண்டு 2 பாடம், அடுத்த ஆண்டு 3 பாடம் என 5 ஆண்டுகளுக்குள் எப்போது வேண்டுமானாலும் எழுதி சான்றிதழ் பெறலாம்.'
-                    : 'You have up to 5 years and 9 attempts to pass. Clear 2 subjects first, then complete the remaining 3 at your comfort.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Reassurance Callout */}
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3">
-              <Sparkles className="w-5 h-5 text-rose-600 shrink-0" />
-              <p className="text-xs text-rose-950 font-medium">
-                {lang === 'ta'
-                  ? 'நினைவில் கொள்ளுங்கள்: NIOS சான்றிதழ் வழக்கமான மாநில போர்டு (State Board) 10 மற்றும் 12-ஆம் வகுப்பு சான்றிதழுக்கு 100% சமமானது. அரசு வேலை மற்றும் கல்லூரி சேர்க்கைக்கு முழு தகுதியுடையது.'
-                  : 'Important Note: NIOS marksheets are 100% equivalent to regular CBSE/State Board certificates for all government jobs, college admissions, and passports.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: Courses & Opportunities Directory */}
-      {activeTab === 'courses' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-          {educationData.map((course) => (
-            <div
-              key={course.id}
-              className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between space-y-4"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    {lang === 'ta' ? course.highlightTa : course.highlight}
-                  </span>
-                  <button
-                    onClick={() =>
-                      speakText(
-                        lang === 'ta'
-                          ? `${course.titleTa}. நிறுவனம்: ${course.providerTa}. ${course.descriptionTa}. கட்டணம்: ${course.feesTa}.`
-                          : `${course.title}. Provider: ${course.provider}. ${course.description}. Fees: ${course.fees}.`,
-                        lang
-                      )
-                    }
-                    className="p-1 text-stone-400 hover:text-emerald-600 rounded-full"
-                    aria-label="Listen"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <h3 className="text-base font-bold text-stone-900 leading-snug mb-1">
-                  {lang === 'ta' ? course.titleTa : course.title}
-                </h3>
-
-                <p className="text-xs text-emerald-700 font-semibold mb-2">
-                  {lang === 'ta' ? course.providerTa : course.provider}
-                </p>
-
-                <p className="text-xs text-stone-600 leading-relaxed mb-3">
-                  {lang === 'ta' ? course.descriptionTa : course.description}
-                </p>
-
-                <div className="grid grid-cols-2 gap-2 text-xs text-stone-600 bg-stone-50 p-2.5 rounded-xl">
-                  <div>
-                    <span className="font-bold text-stone-700 block">
-                      {lang === 'ta' ? 'கால அளவு:' : 'Duration:'}
-                    </span>
-                    <span>{lang === 'ta' ? course.durationTa : course.duration}</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-stone-700 block">
-                      {lang === 'ta' ? 'கட்டணம்:' : 'Fees:'}
-                    </span>
-                    <span className="text-emerald-700 font-semibold">
-                      {lang === 'ta' ? course.feesTa : course.fees}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
-                <span className="text-xs text-stone-500 font-mono text-[11px]">
-                  {course.contactOrLink}
-                </span>
-
-                <button
-                  onClick={() => setSelectedCourse(course)}
-                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl transition"
-                >
-                  {t.common.viewDetails}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tab 3: Digital Literacy & UPI Safety */}
-      {activeTab === 'digital-safety' && (
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-2xs space-y-6 animate-fadeIn">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-cyan-100 text-cyan-800 rounded-2xl">
-                <Smartphone className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-stone-900">
-                  {t.education.digitalLiteracyTitle}
-                </h2>
-                <p className="text-xs text-stone-500">
-                  {lang === 'ta'
-                    ? 'செல்போன் மூலம் பணப்பரிவர்த்தனை செய்யும் போது உங்கள் பணத்தை ஏமாற்றுக்காரர்களிடம் இருந்து காப்பாற்ற 3 பொன் விதிகள்.'
-                    : 'Crucial practical safety rules to protect your hard-earned money from mobile scammers.'}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() =>
-                speakText(
-                  lang === 'ta'
-                    ? 'டிஜிட்டல் பாதுகாப்பு முக்கிய விதிகள்: விதி ஒன்று: கூகுள் பே அல்லது போன்பே மூலம் உங்களுக்கு பணம் வரவு வைக்கும் போது நீங்கள் PIN எண் போடத் தேவையில்லை. யாராவது பணம் அனுப்புகிறேன் என்று PIN போடச் சொன்னால் அது 100% மோசடி. விதி இரண்டு: வங்கி மேலாளர் என்று சொல்லி பேசினாலும் யாருக்கும் OTP அல்லது பாஸ்வேர்டை பகிராதீர்கள்.'
-                    : 'Digital safety golden rules: Rule 1, you NEVER enter your UPI PIN to receive money. If someone asks you to enter your PIN to get cash, it is a scam. Rule 2, never share your OTP with anyone.',
-                  lang
-                )
-              }
-              className="p-2 text-stone-400 hover:text-cyan-600 rounded-full hover:bg-cyan-50"
-              aria-label="Listen"
-            >
-              <Volume2 className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Interactive Golden Safety Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Rule 1 */}
-            <div className="p-5 rounded-2xl border-2 border-rose-300 bg-rose-50/60 space-y-2">
-              <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-                <span>{lang === 'ta' ? 'விதி 1: பணம் பெற PIN தேவையில்லை!' : 'Rule 1: Never Enter PIN to Receive Money'}</span>
-              </div>
-              <p className="text-xs text-rose-950 font-medium leading-relaxed">
-                {t.education.upiSafety1}
-              </p>
-              <div className="text-[11px] bg-white p-2.5 rounded-xl border border-rose-200 text-stone-700">
-                {lang === 'ta'
-                  ? 'உதாரணம்: "உங்களுக்கு மகளிர் திட்ட பணம் ₹3,000 வந்திருக்கிறது, PIN போடுங்கள்" என யாராவது சொன்னால் அது ஏமாற்று வேலை. உடனடியாக அழைப்பை துண்டியுங்கள்.'
-                  : 'Example: Anyone saying "I am sending ₹2,000 grant, just type your PIN to accept" is trying to steal your balance.'}
-              </div>
-            </div>
-
-            {/* Rule 2 */}
-            <div className="p-5 rounded-2xl border-2 border-amber-300 bg-amber-50/60 space-y-2">
-              <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
-                <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
-                <span>{lang === 'ta' ? 'விதி 2: OTP ரகசியத்தை பகிராதீர்கள்' : 'Rule 2: Never Share SMS OTP'}</span>
-              </div>
-              <p className="text-xs text-amber-950 font-medium leading-relaxed">
-                {t.education.upiSafety2}
-              </p>
-              <div className="text-[11px] bg-white p-2.5 rounded-xl border border-amber-200 text-stone-700">
-                {lang === 'ta'
-                  ? 'உண்மையான வங்கி அதிகாரிகள் அல்லது அரசு ஊழியர்கள் ஒருபோதும் உங்கள் செல்போனுக்கு வரும் 4 அல்லது 6 இலக்க OTP-ஐ கேட்க மாட்டார்கள்.'
-                  : 'Authentic bank managers or government officers never ask for your SMS verification code.'}
-              </div>
-            </div>
-          </div>
-
-          {/* Practical WhatsApp Business Tip */}
-          <div className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl space-y-2">
-            <h3 className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>{lang === 'ta' ? 'வாட்ஸ்அப் மூலம் வீட்டு வியாபாரம் செய்வது எப்படி?' : 'WhatsApp Business for Village Home Sales'}</span>
-            </h3>
-            <p className="text-xs text-emerald-900 leading-relaxed">
-              {t.education.whatsappBusinessTip}
-            </p>
-            <ul className="text-xs text-emerald-800 space-y-1 list-disc list-inside">
-              <li>
-                {lang === 'ta'
-                  ? 'நீங்கள் தைத்த ஜாக்கெட் அல்லது தயாரித்த இட்லி பொடி படங்களை வாட்ஸ்அப் ஸ்டேட்டஸில் வையுங்கள்.'
-                  : 'Post photos of stitched blouses or homemade snacks to your WhatsApp status.'}
-              </li>
-              <li>
-                {lang === 'ta'
-                  ? 'விலை மற்றும் கிடைக்கும் அளவை தெளிவாக குறிப்பில் எழுதுங்கள்.'
-                  : 'State price and delivery time clearly.'}
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Course Detailed Modal */}
-      {selectedCourse && (
-        <div
-          role="dialog"
-          aria-label="Course Details"
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
-        >
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+      {/* TAB 1: PERSONALIZED ROADMAP */}
+      {activeTab === 'roadmap' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Interactive Needs Assessment Card */}
+          <div className="bg-white rounded-3xl border border-stone-200 p-5 sm:p-7 shadow-2xs space-y-4">
             <div className="flex items-start justify-between border-b border-stone-100 pb-3">
               <div>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 mb-1 inline-block">
-                  {lang === 'ta' ? selectedCourse.highlightTa : selectedCourse.highlight}
-                </span>
-                <h3 className="text-lg font-bold text-stone-900">
-                  {lang === 'ta' ? selectedCourse.titleTa : selectedCourse.title}
-                </h3>
-                <p className="text-xs text-emerald-700 font-semibold">
-                  {lang === 'ta' ? selectedCourse.providerTa : selectedCourse.provider}
+                <h2 className="text-base font-extrabold text-stone-900 flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-emerald-600" />
+                  <span>
+                    {lang === 'ta'
+                      ? 'உங்கள் நிலையை தேர்ந்தெடுத்து தனிப்பயன் வழிகாட்டியைப் பெறுங்கள்'
+                      : lang === 'hi'
+                      ? 'अपनी स्थिति चुनें और व्यक्तिगत रोडमैप प्राप्त करें'
+                      : 'Select Your Situation to Generate a Custom Action Plan'}
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {lang === 'ta'
+                    ? 'எந்தவித தனிநபர் ரகசிய விவரங்களையும் நாங்கள் கோருவதில்லை; உங்கள் சூழ்நிலைக்குத் தகுந்த சட்டரீதியான வழிகள் மட்டுமே பரிந்துரைக்கப்படுகின்றன.'
+                    : lang === 'hi'
+                    ? 'हम कोई संवेदनशील व्यक्तिगत जानकारी नहीं मांगते; केवल आपकी आवश्यकता अनुसार वैध विकल्प दर्शाए जाते हैं।'
+                    : 'We collect no sensitive personal data. Guidance is tailored purely to your educational stage.'}
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedCourse(null)}
-                className="text-stone-400 hover:text-stone-700 p-1"
-                aria-label="Close"
-              >
-                ✕
-              </button>
             </div>
 
-            <p className="text-xs text-stone-600 leading-relaxed">
-              {lang === 'ta' ? selectedCourse.descriptionTa : selectedCourse.description}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Question 1: Stage */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-800 block">
+                  {lang === 'ta' ? '1. உங்கள் தற்போதைய கல்வி நிலை என்ன?' : lang === 'hi' ? '1. आपकी वर्तमान शैक्षिक स्थिति क्या है?' : '1. What is your current education stage?'}
+                </label>
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value as EducationStage)}
+                  className="w-full text-xs font-semibold p-2.5 bg-stone-50 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500"
+                >
+                  {stagesList.map((stg) => (
+                    <option key={stg.id} value={stg.id}>
+                      {lang === 'ta' ? stg.labelTa : lang === 'hi' ? stg.labelHi : stg.labelEn}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Question 2: Primary Goal */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-800 block">
+                  {lang === 'ta' ? '2. உங்கள் முக்கிய இலக்கு என்ன?' : lang === 'hi' ? '2. आपका प्राथमिक लक्ष्य क्या है?' : '2. What is your primary learning goal?'}
+                </label>
+                <select
+                  value={selectedGoal}
+                  onChange={(e) => setSelectedGoal(e.target.value as LearnerGoal)}
+                  className="w-full text-xs font-semibold p-2.5 bg-stone-50 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="formal_degree">
+                    {lang === 'ta' ? 'அரசு அங்கீகாரம் பெற்ற பள்ளி / கல்லூரி பட்டம் பெறுதல்' : lang === 'hi' ? 'मान्यता प्राप्त स्कूल / कॉलेज डिग्री पूर्ण करना' : 'Complete Formal Board (+2) or College Degree'}
+                  </option>
+                  <option value="vocational_skill">
+                    {lang === 'ta' ? 'உடனடி சுயதொழில் அல்லது கைவினைத் திறன்' : lang === 'hi' ? 'तुरंत रोजगार या व्यावहारिक कौशल' : 'Practical Vocational Skill & Self-Employment'}
+                  </option>
+                  <option value="employment_wfh">
+                    {lang === 'ta' ? 'டிஜிட்டல் அலுவலகம் & வீட்டிலிருந்து வேலை' : lang === 'hi' ? 'डिजिटल कौशल व वर्क फ्रॉम होम' : 'Digital Literacy & Work From Home'}
+                  </option>
+                  <option value="flexible_learning">
+                    {lang === 'ta' ? 'குறைந்த செலவில் பகுதி நேர திறந்தநிலை கற்றல்' : lang === 'hi' ? 'कम लागत में अंशकालिक मुक्त अध्ययन' : 'Low-Cost Flexible Distance Learning'}
+                  </option>
+                </select>
+              </div>
+
+              {/* Question 3: Available Study Time */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-800 block">
+                  {lang === 'ta' ? '3. படிக்க ஒதுக்கக்கூடிய தினசரி நேரம்:' : lang === 'hi' ? '3. अध्ययन हेतु प्रतिदिन उपलब्ध समय:' : '3. Daily available study time:'}
+                </label>
+                <select
+                  value={studyTime}
+                  onChange={(e) => setStudyTime(e.target.value)}
+                  className="w-full text-xs font-semibold p-2.5 bg-stone-50 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="1-2">{lang === 'ta' ? 'தினமும் 1 முதல் 2 மணிநேரம் (மதிய ஓய்வு நேரம்)' : lang === 'hi' ? 'प्रतिदिन 1-2 घंटे (दोपहर फुर्सत में)' : '1 - 2 hours daily (Afternoon / Evening leisure)'}</option>
+                  <option value="3-4">{lang === 'ta' ? 'தினமும் 3 முதல் 4 மணிநேரம்' : lang === 'hi' ? 'प्रतिदिन 3-4 घंटे' : '3 - 4 hours daily'}</option>
+                  <option value="weekends">{lang === 'ta' ? 'சனி மற்றும் ஞாயிறு மட்டும்' : lang === 'hi' ? 'केवल सप्ताहांत (शनिवार व रविवार)' : 'Weekends only'}</option>
+                </select>
+              </div>
+
+              {/* Question 4: Study Mode */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-800 block">
+                  {lang === 'ta' ? '4. விரும்பும் கற்றல் முறை:' : lang === 'hi' ? '4. अध्ययन का पसंदीदा माध्यम:' : '4. Preferred study mode:'}
+                </label>
+                <select
+                  value={studyMode}
+                  onChange={(e) => setStudyMode(e.target.value)}
+                  className="w-full text-xs font-semibold p-2.5 bg-stone-50 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="home_distance">{lang === 'ta' ? 'வீட்டிலிருந்தே அஞ்சல் வழி புத்தகங்கள் மூலம் படித்தல்' : lang === 'hi' ? 'घर बैठे डाक द्वारा प्राप्त किताबों से पढ़ाई' : 'Study from home with free mailed books (No daily classes)'}</option>
+                  <option value="practical_center">{lang === 'ta' ? 'அருகில் உள்ள அரசு மையத்தில் நேரடி செய்முறைப் பயிற்சி' : lang === 'hi' ? 'निकटतम सरकारी केंद्र पर प्रायोगिक प्रशिक्षण' : 'In-person weekend practical centers'}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Empathy Reassurance Banner */}
+          <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-teal-700 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-xs font-bold text-teal-950 uppercase tracking-wide">
+                {lang === 'ta' ? 'தோழியின் ஊக்கக்குரல்:' : lang === 'hi' ? 'प्रेरणा संदेश:' : 'Encouragement Note:'}
+              </h3>
+              <p className="text-xs text-teal-900 mt-1 leading-relaxed">
+                {getLocalized(roadmapData.empathyNoteTa, roadmapData.empathyNoteHi, roadmapData.empathyNote)}
+              </p>
+            </div>
+          </div>
+
+          {/* Generated Roadmap Steps (Checkable & Actionable) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-stone-900">
+                  {getLocalized(roadmapData.headlineTa, roadmapData.headlineHi, roadmapData.headline)}
+                </h3>
+                <p className="text-xs text-stone-500">
+                  {lang === 'ta'
+                    ? 'ஒவ்வொரு படியையும் முடித்தவுடன் டிக் செய்து உங்கள் முன்னேற்றத்தை சேமிக்கலாம்.'
+                    : lang === 'hi'
+                    ? 'प्रत्येक चरण पूरा होने पर टिक लगाकर अपनी प्रगति सहेजें।'
+                    : 'Check off each milestone as you complete it. Your progress is saved locally.'}
+                </p>
+              </div>
+
+              <div className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full">
+                {completedStepIds.filter((id) => roadmapData.steps.some((s) => s.id === id)).length} / {roadmapData.steps.length} {lang === 'ta' ? 'முடிந்தது' : lang === 'hi' ? 'पूर्ण' : 'Done'}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {roadmapData.steps.map((step) => {
+                const isCompleted = completedStepIds.includes(step.id);
+                return (
+                  <div
+                    key={step.id}
+                    className={`rounded-2xl border p-4 sm:p-5 transition shadow-2xs ${
+                      isCompleted
+                        ? 'bg-emerald-50/60 border-emerald-300'
+                        : 'bg-white border-stone-200 hover:border-emerald-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox toggle */}
+                      <button
+                        onClick={() => toggleStepCompleted(step.id)}
+                        className="mt-0.5 text-stone-400 hover:text-emerald-700 transition shrink-0"
+                        aria-label={isCompleted ? 'Mark as incomplete' : 'Mark as complete'}
+                      >
+                        {isCompleted ? (
+                          <CheckSquare className="w-5 h-5 text-emerald-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-stone-400" />
+                        )}
+                      </button>
+
+                      <div className="flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h4
+                            className={`text-sm font-bold ${
+                              isCompleted ? 'text-emerald-950 line-through' : 'text-stone-900'
+                            }`}
+                          >
+                            {step.stepNumber}. {getLocalized(step.titleTa, step.titleHi, step.title)}
+                          </h4>
+
+                          <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-stone-100 text-stone-700 rounded-full flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-stone-400" />
+                            <span>{step.estimatedDuration}</span>
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-stone-700 leading-relaxed">
+                          {getLocalized(step.descriptionTa, step.descriptionHi, step.description)}
+                        </p>
+
+                        {/* Metadata row: Portal, Cost, Action Link */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-100 text-xs">
+                          <div className="flex flex-wrap items-center gap-3 text-stone-600">
+                            <span>
+                              <strong>{lang === 'ta' ? 'அதிகாரப்பூர்வ தளம்:' : lang === 'hi' ? 'आधिकारिक संस्थान:' : 'Official Institution:'}</strong>{' '}
+                              {step.institutionOrPortal}
+                            </span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-bold">
+                              {getLocalized(step.costEstimateTa, step.costEstimateHi, step.costEstimate)}
+                            </span>
+                          </div>
+
+                          {step.portalUrl && step.portalUrl.startsWith('http') && (
+                            <a
+                              href={step.portalUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 underline ml-auto"
+                            >
+                              <span>{lang === 'ta' ? 'அரசு போர்ட்டலை பார்க்க' : lang === 'hi' ? 'आधिकारिक पोर्टल खोलें' : 'Open Official Portal'}</span>
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: COURSE VERIFICATION & SCAM PRECAUTIONS */}
+      {activeTab === 'verification' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Scam Alert Callout */}
+          <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-5 sm:p-7 shadow-xs space-y-3">
+            <div className="flex items-center gap-2 text-rose-900 font-extrabold text-base">
+              <AlertTriangle className="w-5 h-5 text-rose-600" />
+              <span>
+                {lang === 'ta'
+                  ? 'மோசடி எச்சரிக்கை: போலி பட்டங்கள் மற்றும் இடைத்தரகர்களிடம் ஏமாறாதீர்கள்!'
+                  : lang === 'hi'
+                  ? 'सावधानी: फर्जी डिग्रियों और बिचौलियों से सावधान रहें!'
+                  : 'Fraud Warning: Protect Yourself from Fake Degrees & Scam Agents'}
+              </span>
+            </div>
+            <p className="text-xs text-rose-950 leading-relaxed">
+              {lang === 'ta'
+                ? 'படிப்பை பாதியில் நிறுத்திய பெண்களின் அவசரத்தை பயன்படுத்தி "பரீட்சையே எழுதாமல் 6 மாதத்தில் டிகிரி தருகிறோம்", "நேரடி பாஸ் கேரண்டி" என்று சமூக ஊடகங்களிலும் கிராமப்புறங்களிலும் பல தனியார் ஏஜெண்டுகள் ₹20,000 முதல் ₹50,000 வரை பறிக்கிறார்கள். இதுபோன்ற அங்கீகாரமற்ற சான்றிதழ்கள் அரசு வேலை மற்றும் பாஸ்போர்ட் சரிபார்ப்பில் செல்லாது.'
+                : lang === 'hi'
+                ? '"बिना परीक्षा दिए 6 महीने में डिग्री" या "100% पास गारंटी" का दावा करने वाले बिचौलियों से बचें। ऐसे अनधिकृत प्रमाणपत्र किसी भी सरकारी नौकरी या आगे की पढ़ाई के लिए अमान्य होते हैं।'
+                : 'Scam agents target women who discontinued studies by promising "Guaranteed Degree without writing exams" or "Direct Pass in 3 months" for hefty sums. Unaccredited certificates are legally invalid for government employment, higher education, or passport verification.'}
             </p>
+          </div>
 
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-stone-800">
-                {lang === 'ta' ? 'சேருவது எப்படி (வழிமுறைகள்):' : 'How to Enroll:'}
-              </h4>
-              <ul className="space-y-1.5 text-xs text-stone-700">
-                {(lang === 'ta' ? selectedCourse.howToEnrollTa : selectedCourse.howToEnroll).map(
-                  (step, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-emerald-600 font-bold">•</span>
-                      <span>{step}</span>
-                    </li>
-                  )
-                )}
-              </ul>
+          {/* 4 Pillars of Course Verification */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-extrabold text-stone-900 uppercase tracking-wide">
+              {lang === 'ta' ? 'சேருவதற்கு முன் சரிபார்க்க வேண்டிய 4 முக்கிய காரணிகள்:' : lang === 'hi' ? 'प्रवेश पूर्व 4 अनिवार्य सत्यापन बिंदु:' : '4 Essential Checks Before Enrolling:'}
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {verificationChecklist.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs space-y-2 flex flex-col justify-between"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                      <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{getLocalized(item.titleTa, item.titleHi, item.title)}</span>
+                    </div>
+                    <p className="text-xs text-stone-700 leading-relaxed">
+                      {getLocalized(item.checkTa, item.checkHi, item.check)}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs">
+                    <span className="text-[11px] text-stone-500">
+                      {lang === 'ta' ? 'சரிபார்க்க வேண்டிய போர்டல்:' : lang === 'hi' ? 'सत्यापन पोर्टल:' : 'Verification Portal:'}
+                    </span>
+                    <a
+                      href={item.officialPortal}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                    >
+                      <span>{item.officialPortal.replace('https://', '')}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="p-3 bg-stone-50 rounded-xl text-xs text-stone-700 flex items-center justify-between">
-              <span>{lang === 'ta' ? 'தொடர்பு / தளம்:' : 'Contact:'}</span>
-              <span className="font-bold text-emerald-800">{selectedCourse.contactOrLink}</span>
-            </div>
+      {/* TAB 3: OPEN PROGRAMS & DEGREE DIRECTORY */}
+      {activeTab === 'directory' && (
+        <div className="space-y-4 animate-fadeIn">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Card 1: NIOS */}
+            <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    {lang === 'ta' ? 'மத்திய அரசு திறந்தநிலை பள்ளி' : lang === 'hi' ? 'राष्ट्रीय मुक्त विद्यालयी शिक्षा' : 'Govt of India Open School'}
+                  </span>
+                  <h3 className="text-base font-bold text-stone-900 mt-1">
+                    NIOS 10th & 12th Board Examinations
+                  </h3>
+                </div>
+                <Award className="w-5 h-5 text-emerald-600" />
+              </div>
 
-            <div className="pt-2 text-right">
-              <button
-                onClick={() => setSelectedCourse(null)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold"
+              <p className="text-xs text-stone-600 leading-relaxed">
+                {lang === 'ta'
+                  ? 'பள்ளி மாற்றுச் சான்றிதழ் (TC) இல்லாவிட்டாலும் வயது சான்று கொண்டு நேரடியாக சேரலாம். தமிழ் வழியில் இலவச பாடப்புத்தகங்கள் வீட்டிற்கு அனுப்பப்படும். 5 வருடங்களில் 9 தவணைகளில் தேர்வு எழுதலாம்.'
+                  : 'Direct admission based on Aadhaar self-declaration even without school Transfer Certificate. Books sent free to home. Pass 5 subjects in flexible installments over 5 years.'}
+              </p>
+
+              <div className="p-2.5 bg-stone-50 rounded-xl text-xs space-y-1">
+                <div><strong>{lang === 'ta' ? 'செலவு:' : 'Cost:'}</strong> Approx ₹2,000 - ₹3,500 total</div>
+                <div><strong>{lang === 'ta' ? 'தகுதி:' : 'Eligibility:'}</strong> 14+ for 10th, 10th pass for 12th</div>
+              </div>
+
+              <a
+                href="https://sdmis.nios.ac.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800"
               >
-                {t.common.close}
-              </button>
+                <span>sdmis.nios.ac.in</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Card 2: IGNOU */}
+            <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                    {lang === 'ta' ? 'மத்திய திறந்தநிலைப் பல்கலைக்கழகம்' : lang === 'hi' ? 'केंद्रीय मुक्त विश्वविद्यालय' : 'Central Open University'}
+                  </span>
+                  <h3 className="text-base font-bold text-stone-900 mt-1">
+                    IGNOU Bachelor Degrees (BA, B.Com, BSW, BTS)
+                  </h3>
+                </div>
+                <GraduationCap className="w-5 h-5 text-blue-600" />
+              </div>
+
+              <p className="text-xs text-stone-600 leading-relaxed">
+                {lang === 'ta'
+                  ? 'யுஜிசி (UGC-DEB) அங்கீகாரம் பெற்ற முழு பட்டப்படிப்பு. தினமும் கல்லூரி செல்ல வேண்டியதில்லை. மாவட்ட அரசு கல்லூரிகளில் வார இறுதி உதவி வகுப்புகள் மற்றும் தேர்வுகள் நடைபெறும்.'
+                  : 'World’s largest open university offering UGC-DEB recognized Bachelor’s degrees. Weekend counseling sessions at district colleges with distance self-study modules.'}
+              </p>
+
+              <div className="p-2.5 bg-stone-50 rounded-xl text-xs space-y-1">
+                <div><strong>{lang === 'ta' ? 'செலவு:' : 'Cost:'}</strong> ₹3,000 - ₹5,000 per year</div>
+                <div><strong>{lang === 'ta' ? 'தகுதி:' : 'Eligibility:'}</strong> 10+2 or equivalent from any recognized board</div>
+              </div>
+
+              <a
+                href="https://ignouadmission.samarth.edu.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-800"
+              >
+                <span>ignouadmission.samarth.edu.in</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Card 3: TNOU */}
+            <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                    {lang === 'ta' ? 'தமிழ்நாடு அரசு பல்கலைக்கழகம்' : lang === 'hi' ? 'तमिलनाडु सरकार विश्वविद्यालय' : 'Govt of Tamil Nadu Open University'}
+                  </span>
+                  <h3 className="text-base font-bold text-stone-900 mt-1">
+                    TNOU Distance Degrees & Vocational Diplomas
+                  </h3>
+                </div>
+                <BookOpen className="w-5 h-5 text-rose-600" />
+              </div>
+
+              <p className="text-xs text-stone-600 leading-relaxed">
+                {lang === 'ta'
+                  ? 'தமிழ் வழியில் பாடப்புத்தகங்கள் மற்றும் தேர்வுகள். இல்லத்தரசிகள், கிராமப்புற பெண்களுக்கு சிறப்பு சலுகைகள். அஞ்சல் வழியாக வீட்டுக்கே பாடப் புத்தகங்கள் அனுப்பப்படும்.'
+                  : 'Tamil and English medium degree programs with localized learner support centers across all 38 districts of Tamil Nadu.'}
+              </p>
+
+              <div className="p-2.5 bg-stone-50 rounded-xl text-xs space-y-1">
+                <div><strong>{lang === 'ta' ? 'செலவு:' : 'Cost:'}</strong> Subsidized govt fees (SC/ST concessions)</div>
+                <div><strong>{lang === 'ta' ? 'தள முகவரி:' : 'Portal:'}</strong> tnou.ac.in</div>
+              </div>
+
+              <a
+                href="https://tnou.ac.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 hover:text-rose-800"
+              >
+                <span>tnou.ac.in</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Card 4: PMKVY / Skill India */}
+            <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                    {lang === 'ta' ? 'இலவச அரசு தொழிற்பயிற்சி' : lang === 'hi' ? 'मुफ्त सरकारी कौशल प्रशिक्षण' : '100% Free Govt Vocational Training'}
+                  </span>
+                  <h3 className="text-base font-bold text-stone-900 mt-1">
+                    PMKVY & State Skill Development Missions
+                  </h3>
+                </div>
+                <Sparkles className="w-5 h-5 text-amber-600" />
+              </div>
+
+              <p className="text-xs text-stone-600 leading-relaxed">
+                {lang === 'ta'
+                  ? 'தையல் மற்றும் ஆடை வடிவமைப்பு, அழகுக்கலை, உணவு பதப்படுத்துதல், மற்றும் கணினி டேட்டா என்ட்ரி ஆகியவற்றில் 100% இலவச அரசு பயிற்சி மற்றும் NCVET சான்றிதழ்.'
+                  : 'Short-term free industry courses with NSQF certification and placement assistance for self-employment or local jobs.'}
+              </p>
+
+              <div className="p-2.5 bg-stone-50 rounded-xl text-xs space-y-1">
+                <div><strong>{lang === 'ta' ? 'செலவு:' : 'Cost:'}</strong> 100% Free with Govt Stipend</div>
+                <div><strong>{lang === 'ta' ? 'தள முகவரி:' : 'Portal:'}</strong> skillindiadigital.gov.in</div>
+              </div>
+
+              <a
+                href="https://www.skillindiadigital.gov.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-800"
+              >
+                <span>skillindiadigital.gov.in</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: SMARTPHONE & DIGILOCKER SAFETY */}
+      {activeTab === 'digital-safety' && (
+        <div className="space-y-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-2xs space-y-5">
+            <h3 className="text-base font-extrabold text-stone-900">
+              {lang === 'ta' ? 'டிஜிட்டல் ஆவணங்கள் மற்றும் மொபைல் பாதுகாப்பு' : lang === 'hi' ? 'डिजिटल दस्तावेज व मोबाइल सुरक्षा' : 'Digital Certificates & Mobile Safety'}
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">
+                  1
+                </span>
+                <h4 className="text-xs font-bold text-stone-900">DigiLocker App</h4>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  {lang === 'ta'
+                    ? 'மத்திய அரசின் அதிகாரப்பூர்வ டிஜிலாக்கர் செயலியை பதிவிறக்கம் செய்து உங்கள் ஆதார் மூலம் உள்நுழைந்து 10, 12 மற்றும் கல்லூரி சான்றிதழ்களை எப்போது வேண்டுமானாலும் இலவசமாக பதிவிறக்கலாம்.'
+                    : 'Download the official DigiLocker app to legally access your 10th/12th marksheets and degree certificates backed by IT Act Section 9A.'}
+                </p>
+                <a
+                  href="https://www.digilocker.gov.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-emerald-700 underline flex items-center gap-1"
+                >
+                  <span>digilocker.gov.in</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                  2
+                </span>
+                <h4 className="text-xs font-bold text-stone-900">Academic Bank of Credits (ABC)</h4>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  {lang === 'ta'
+                    ? 'abc.gov.in-ல் உங்கள் APAAR / ABC ID கணக்கைத் தொடங்குங்கள். கல்லூரியில் நீங்கள் தேர்ச்சி பெற்ற ஒவ்வொரு பாடத்தின் கிரெடிட் புள்ளிகளும் இதில் வாழ்நாள் முழுவதும் பத்திரமாக இருக்கும்.'
+                    : 'Create your 12-digit APAAR / ABC ID on abc.gov.in. Course credits from past universities are preserved for seamless re-entry.'}
+                </p>
+                <a
+                  href="https://www.abc.gov.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-blue-700 underline flex items-center gap-1"
+                >
+                  <span>abc.gov.in</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                <span className="w-6 h-6 rounded-full bg-amber-600 text-white font-bold text-xs flex items-center justify-center">
+                  3
+                </span>
+                <h4 className="text-xs font-bold text-stone-900">OTP & PIN Safety</h4>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  {lang === 'ta'
+                    ? 'பள்ளி அல்லது கல்லூரி சேர்க்கை என்ற பெயரில் உங்கள் மொபைலுக்கு வரும் வங்கி அல்லது ஆதார் OTP எண்களை யாரிடமும் பகிராதீர்கள். கட்டணம் எப்போதும் அரசு ரசீதுடன் மட்டுமே செலுத்தப்பட வேண்டும்.'
+                    : 'Never disclose bank OTP, UPI PIN, or Aadhaar authentication OTP to anyone claiming to be an admission agent. Always pay fees directly via official portal receipts.'}
+                </p>
+              </div>
             </div>
           </div>
         </div>

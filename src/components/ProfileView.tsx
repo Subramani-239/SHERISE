@@ -18,7 +18,14 @@ import {
   ArrowRight,
   RefreshCw,
   PhoneCall,
-  ShieldCheck
+  ShieldCheck,
+  Fingerprint,
+  ScanFace,
+  Camera,
+  X,
+  ExternalLink,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import { Language, UserProfile, ActiveTab } from '../types';
 import { sampleDemoProfiles, generateDemoId } from '../data/demoProfilesData';
@@ -43,6 +50,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const [formData, setFormData] = useState<UserProfile>(userProfile);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeDemoModal, setActiveDemoModal] = useState<'aadhaar' | 'face' | null>(null);
+  const [aadhaarSimulatedStep, setAadhaarSimulatedStep] = useState(false);
+  const [faceSimulatedStep, setFaceSimulatedStep] = useState(false);
 
   const handleSwitchDemoProfile = (demo: UserProfile) => {
     setFormData(demo);
@@ -391,6 +401,301 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Profile Verification Section (Aadhaar & Face ID) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+          <div>
+            <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <span>
+                {lang === 'ta'
+                  ? 'அடையாள சரிபார்ப்பு பிரிவுகள் (Identity Verification - Demo Mode)'
+                  : lang === 'hi'
+                  ? 'पहचान सत्यापन अनुभाग (Identity Verification - Demo Mode)'
+                  : 'Identity Verification Sections'}
+              </span>
+            </h2>
+            <p className="text-xs text-stone-500 mt-0.5">
+              {lang === 'ta'
+                ? 'முற்றிலும் விருப்பமானது. மாதிரி ஹேக்கத்தான் செயல்முறை விளக்கத்திற்காக மட்டுமே; உண்மையான தகவல்கள் கோரப்படுவதில்லை.'
+                : 'Both options are completely optional. Designed for sandbox demonstration without collecting real identity data.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Card 1: Aadhaar Verification */}
+          <div className="bg-white rounded-3xl border border-stone-200 p-5 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-blue-50 text-blue-700 rounded-2xl border border-blue-200">
+                    <Fingerprint className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-stone-900">
+                      {t.profile.verification?.aadhaarTitle || 'Aadhaar Verification'}
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
+                      {t.profile.verification?.optionalBadge || 'Optional / Demo Only'}
+                    </span>
+                  </div>
+                </div>
+
+                <span className="px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>{t.profile.verification?.demoModeBadge || 'Demo Mode — Not Connected'}</span>
+                </span>
+              </div>
+
+              {/* Status Display */}
+              <div className="p-3 bg-stone-50 border border-stone-200 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-stone-700 font-medium">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{t.profile.verification?.aadhaarStatus || 'Status: Demo Sandbox (Not Connected to UIDAI)'}</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
+                  Sandbox
+                </span>
+              </div>
+
+              {/* Privacy Notice */}
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-[11px] text-amber-950 flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  {t.profile.verification?.aadhaarNotice ||
+                    'For hackathon demonstration only. In production, this would integrate with UIDAI Aadhaar Paperless Offline e-KYC or DigiLocker via licensed AUA/KUA gateway with consent and OTP. No real Aadhaar number or identity documents are requested or stored.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+              <span className="text-[11px] text-stone-500">
+                {lang === 'ta' ? 'மாதிரி திரையை திறக்க' : 'Simulate sandbox flow'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAadhaarSimulatedStep(false);
+                  setActiveDemoModal('aadhaar');
+                }}
+                className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs"
+              >
+                <span>{t.profile.verification?.openDemoBtn || 'Open Demo'}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Face ID Verification */}
+          <div className="bg-white rounded-3xl border border-stone-200 p-5 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-purple-50 text-purple-700 rounded-2xl border border-purple-200">
+                    <ScanFace className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-stone-900">
+                      {t.profile.verification?.faceIdTitle || 'Face ID Verification'}
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
+                      {t.profile.verification?.optionalBadge || 'Optional / Demo Only'}
+                    </span>
+                  </div>
+                </div>
+
+                <span className="px-2.5 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-[11px] font-bold inline-flex items-center gap-1.5 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>{t.profile.verification?.demoModeBadge || 'Demo Mode — Not Connected'}</span>
+                </span>
+              </div>
+
+              {/* Status Display */}
+              <div className="p-3 bg-stone-50 border border-stone-200 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-stone-700 font-medium">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{t.profile.verification?.faceStatus || 'Status: Demo Sandbox (Not Connected to Biometric Service)'}</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
+                  Sandbox
+                </span>
+              </div>
+
+              {/* Privacy Notice */}
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-[11px] text-amber-950 flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  {t.profile.verification?.faceNotice ||
+                    'For hackathon demonstration only. In production, this would integrate with a certified liveness detection and biometric authentication provider compliant with local data privacy regulations. No real camera access, face images, or biometric data are captured or stored.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+              <span className="text-[11px] text-stone-500">
+                {lang === 'ta' ? 'மாதிரி திரையை திறக்க' : 'Simulate sandbox flow'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFaceSimulatedStep(false);
+                  setActiveDemoModal('face');
+                }}
+                className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs"
+              >
+                <span>{t.profile.verification?.openDemoBtn || 'Open Demo'}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Interactive Demo Simulation Modal */}
+      {activeDemoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-stone-200 shadow-2xl p-6 sm:p-7 space-y-5 animate-scaleUp">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-2.5 rounded-2xl border ${
+                    activeDemoModal === 'aadhaar'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : 'bg-purple-50 text-purple-700 border-purple-200'
+                  }`}
+                >
+                  {activeDemoModal === 'aadhaar' ? (
+                    <Fingerprint className="w-6 h-6" />
+                  ) : (
+                    <ScanFace className="w-6 h-6" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                      Demo Mode — Not Connected
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600">
+                      Optional
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-stone-900 mt-1">
+                    {activeDemoModal === 'aadhaar'
+                      ? t.profile.verification?.demoModalTitleAadhaar || 'Aadhaar Verification Demo (UIDAI Sandbox Mock)'
+                      : t.profile.verification?.demoModalTitleFace || 'Face ID Biometric Verification Demo (Liveness Sandbox Mock)'}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveDemoModal(null)}
+                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Explanatory Sandbox Box */}
+            <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl text-xs space-y-2 text-stone-700">
+              <p className="leading-relaxed">
+                {activeDemoModal === 'aadhaar'
+                  ? t.profile.verification?.demoExplanationAadhaar ||
+                    'In production, this would integrate via a licensed UIDAI AUA/KUA gateway or DigiLocker using user-consented OTP verification. This demo is isolated with test mock data only.'
+                  : t.profile.verification?.demoExplanationFace ||
+                    'In production, this would integrate with a certified biometric liveness detection provider compliant with Indian digital personal data protection laws. This demo is isolated with test mock flows only.'}
+              </p>
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-700" />
+                <span>
+                  {lang === 'ta'
+                    ? 'பாதுகாப்பு உறுதி: உங்கள் உண்மையான ஆதார் எண் அல்லது முகப் படம் எதுவும் இந்த இணையதளத்தில் சேகரிக்கப்படவோ சரிபார்க்கப்படவோ இல்லை.'
+                    : 'Privacy Safeguard: No real identity numbers or face images are collected or stored. Verification is not claimed as completed.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Sandbox Simulation Canvas */}
+            <div className="p-5 bg-stone-950 text-white rounded-2xl space-y-3 font-mono text-xs">
+              <div className="flex items-center justify-between text-[11px] text-stone-400 border-b border-stone-800 pb-2">
+                <span>SANDBOX SIMULATION CONSOLE</span>
+                <span className="text-amber-400">STATUS: OFFLINE MOCK</span>
+              </div>
+
+              {activeDemoModal === 'aadhaar' ? (
+                <div className="space-y-2 text-stone-300 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Masked Test ID:</span>
+                    <span className="text-emerald-400 font-bold">XXXX-XXXX-9012 (Demo Only)</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Consent Hash:</span>
+                    <span className="text-stone-400">e3b0c44298fc1c149afbf4c8</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Simulated Gateway:</span>
+                    <span className="text-stone-400">uidai-sandbox-mock.local (Disconnected)</span>
+                  </div>
+                  {aadhaarSimulatedStep && (
+                    <div className="p-2.5 bg-stone-900 rounded-xl border border-stone-800 text-[11px] text-amber-300">
+                      ℹ️ Mock Sandbox Test: Sample packet checked in browser memory. Real verification remains unconnected.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2 text-stone-300 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Camera Permission:</span>
+                    <span className="text-stone-400">Not Requested (Simulated)</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Liveness Mesh Test:</span>
+                    <span className="text-emerald-400 font-bold">Mock 3D Landmarks Vector [Demo]</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Biometric Provider:</span>
+                    <span className="text-stone-400">biometric-sandbox-mock.local (Disconnected)</span>
+                  </div>
+                  {faceSimulatedStep && (
+                    <div className="p-2.5 bg-stone-900 rounded-xl border border-stone-800 text-[11px] text-amber-300">
+                      ℹ️ Mock Sandbox Test: Sample geometry checked in browser memory. No face capture was performed.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeDemoModal === 'aadhaar') {
+                    setAadhaarSimulatedStep(true);
+                  } else {
+                    setFaceSimulatedStep(true);
+                  }
+                }}
+                className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-900 font-bold rounded-xl text-xs transition border border-stone-300"
+              >
+                {lang === 'ta' ? 'மாதிரி சோதனையை இயக்கு' : 'Simulate Sandbox Step'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveDemoModal(null)}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-xs"
+              >
+                {t.profile.verification?.closeDemoBtn || 'Close Demo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cross-Feature Connections Card */}
       <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-3xl p-5 sm:p-7 space-y-3">

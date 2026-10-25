@@ -25,7 +25,8 @@ import {
   AlertTriangle,
   MessageCircle,
   GraduationCap as LearnIcon,
-  UserCheck
+  UserCheck,
+  Package
 } from 'lucide-react';
 import { Language, ActiveTab } from '../types';
 import { translations } from '../data/translations';
@@ -69,6 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'schemes', label: t.nav.schemes, icon: <FileCheck2 className="w-4 h-4" /> },
     { id: 'skills-learning', label: t.nav.skillsLearning, icon: <LearnIcon className="w-4 h-4" /> },
     { id: 'skills', label: t.nav.skills, icon: <Sparkle className="w-4 h-4" /> },
+    { id: 'orders', label: t.nav.orders, icon: <Package className="w-4 h-4" /> },
     { id: 'chat-call', label: t.nav.chatCall, icon: <MessageCircle className="w-4 h-4" /> },
     { id: 'business-generator', label: t.nav.businessGenerator, icon: <Sparkles className="w-4 h-4" /> },
     { id: 'budget-calculator', label: t.nav.budgetCalculator, icon: <Calculator className="w-4 h-4" /> },

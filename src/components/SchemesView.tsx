@@ -68,12 +68,47 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
 
+  // Listen for browser popstate to close modal if open
+  useEffect(() => {
+    const handlePopState = () => {
+      if (selectedSchemeForModal) {
+        setSelectedSchemeForModal(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedSchemeForModal]);
+
+  const handleOpenModal = (scheme: Scheme) => {
+    setSelectedSchemeForModal(scheme);
+    try {
+      window.history.pushState({ modal: 'scheme-details' }, '');
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCloseModal = () => {
+    setSelectedSchemeForModal(null);
+  };
+
   const governmentLevels = [
-    { id: 'all', label: lang === 'ta' ? 'அனைத்து நிலைகள்' : lang === 'hi' ? 'सभी स्तर' : 'All Levels' },
-    { id: 'central', label: lang === 'ta' ? '🇮🇳 மத்திய அரசு' : lang === 'hi' ? '🇮🇳 केंद्र सरकार' : '🇮🇳 Central Govt' },
-    { id: 'tamil_nadu', label: lang === 'ta' ? '🏛️ தமிழ்நாடு அரசு' : lang === 'hi' ? '🏛️ तमिलनाडु सरकार' : '🏛️ Tamil Nadu' },
-    { id: 'puducherry', label: lang === 'ta' ? '🌴 புதுச்சேரி அரசு' : lang === 'hi' ? '🌴 पुदुचेरी सरकार' : '🌴 Puducherry' },
-    { id: 'other_states', label: lang === 'ta' ? '🗺️ பிற மாநிலங்கள்' : lang === 'hi' ? '🗺️ अन्य राज्य' : '🗺️ Other States' },
+    { 
+      id: 'all', 
+      label: lang === 'ta' ? 'அனைத்து திட்டங்கள் (40)' : lang === 'hi' ? 'सभी 40 योजनाएं' : 'All Schemes (40)' 
+    },
+    { 
+      id: 'puducherry', 
+      label: lang === 'ta' ? '🌴 புதுச்சேரி அரசு (16)' : lang === 'hi' ? '🌴 पुदुचेरी सरकार (16)' : '🌴 Puducherry UT (16)' 
+    },
+    { 
+      id: 'tamil_nadu', 
+      label: lang === 'ta' ? '🏛️ தமிழ்நாடு அரசு (16)' : lang === 'hi' ? '🏛️ तमिलनाडु सरकार (16)' : '🏛️ Tamil Nadu (16)' 
+    },
+    { 
+      id: 'central', 
+      label: lang === 'ta' ? '🇮🇳 மத்திய அரசு (8)' : lang === 'hi' ? '🇮🇳 केंद्र सरकार (8)' : '🇮🇳 Central Govt (8)' 
+    },
   ];
 
   const categories = [
@@ -190,15 +225,20 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
       {/* Top Breadcrumb & Back Bar */}
       <div className="flex items-center justify-between text-xs font-semibold text-stone-600 bg-stone-50 border border-stone-200 rounded-2xl px-4 py-2.5">
         <div className="flex items-center gap-2">
-          {onNavigateBack && (
-            <button
-              onClick={onNavigateBack}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-stone-300 hover:bg-stone-100 rounded-lg text-stone-800 font-bold transition shadow-2xs"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>{t.common.back}</span>
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (selectedSchemeForModal) {
+                handleCloseModal();
+              } else if (onNavigateBack) {
+                onNavigateBack();
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-stone-300 hover:bg-stone-100 rounded-lg text-stone-800 font-bold transition shadow-2xs"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>{t.common.back}</span>
+          </button>
           <span>{lang === 'ta' ? 'முகப்பு' : lang === 'hi' ? 'होम' : 'Home'}</span>
           <span>/</span>
           <span className="text-rose-700 font-bold">{t.nav.schemes}</span>
@@ -699,7 +739,7 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
                 )}
 
                 <button
-                  onClick={() => setSelectedSchemeForModal(scheme)}
+                  onClick={() => handleOpenModal(scheme)}
                   className="flex items-center gap-1 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl transition"
                 >
                   <span>{t.common.viewDetails}</span>
@@ -776,7 +816,7 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
               </div>
 
               <button
-                onClick={() => setSelectedSchemeForModal(null)}
+                onClick={handleCloseModal}
                 className="p-2 text-stone-400 hover:text-stone-700 rounded-full hover:bg-stone-100 transition"
                 aria-label="Close details"
               >
@@ -912,19 +952,29 @@ export const SchemesView: React.FC<SchemesViewProps> = ({
               </ol>
             </div>
 
-            {/* Links and Helplines Footer */}
+            {/* Links, Helplines and Back Footer */}
             <div className="pt-4 border-t border-stone-100 flex flex-wrap items-center justify-between gap-3">
-              {selectedSchemeForModal.helpline && (
-                <a
-                  href={`tel:${selectedSchemeForModal.helpline.split('/')[0].trim()}`}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 hover:bg-stone-200 rounded-xl text-xs font-bold text-stone-800"
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCloseModal}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold transition"
                 >
-                  <PhoneCall className="w-3.5 h-3.5 text-rose-600" />
-                  <span>
-                    {t.common.helpline}: {selectedSchemeForModal.helpline}
-                  </span>
-                </a>
-              )}
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>{lang === 'ta' ? 'பட்டியலுக்கு திரும்பு' : lang === 'hi' ? 'सूची पर वापस' : 'Back to Schemes'}</span>
+                </button>
+
+                {selectedSchemeForModal.helpline && (
+                  <a
+                    href={`tel:${selectedSchemeForModal.helpline.split('/')[0].trim()}`}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 rounded-xl text-xs font-bold text-rose-800"
+                  >
+                    <PhoneCall className="w-3.5 h-3.5 text-rose-600" />
+                    <span>
+                      {t.common.helpline}: {selectedSchemeForModal.helpline}
+                    </span>
+                  </a>
+                )}
+              </div>
 
               {selectedSchemeForModal.officialUrl && (
                 <a

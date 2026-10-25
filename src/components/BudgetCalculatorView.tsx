@@ -18,9 +18,12 @@ import {
   ShieldCheck,
   AlertTriangle,
   FileSpreadsheet,
-  Info
+  Info,
+  ArrowLeft,
+  Store,
+  ShoppingBag
 } from 'lucide-react';
-import { Language, BudgetRecord, BudgetItemPlan } from '../types';
+import { Language, ActiveTab, BudgetRecord, BudgetItemPlan } from '../types';
 import { translations } from '../data/translations';
 import {
   calculateBusinessProfit,
@@ -28,15 +31,22 @@ import {
   formatCurrency,
 } from '../utils/calculator';
 import { speakText } from '../utils/speech';
+import { RawMaterialFinderModal } from './RawMaterialFinderModal';
 
 interface BudgetCalculatorViewProps {
   lang: Language;
+  onNavigateBack?: () => void;
+  onNavigate?: (tab: ActiveTab) => void;
 }
 
 export const BudgetCalculatorView: React.FC<BudgetCalculatorViewProps> = ({
   lang,
+  onNavigateBack,
+  onNavigate,
 }) => {
   const t = translations[lang];
+
+  const [isRawMaterialModalOpen, setIsRawMaterialModalOpen] = useState(false);
 
   // 1. Business Profit & Operating Margin States
   const [salesRevenue, setSalesRevenue] = useState<number>(15000);
@@ -247,6 +257,30 @@ export const BudgetCalculatorView: React.FC<BudgetCalculatorViewProps> = ({
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fadeIn">
+      {/* Top Breadcrumb & Back Bar */}
+      <div className="flex items-center justify-between text-xs font-semibold text-stone-600 bg-stone-50 border border-stone-200 rounded-2xl px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          {onNavigateBack && (
+            <button
+              onClick={onNavigateBack}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-stone-300 hover:bg-stone-100 rounded-lg text-stone-800 font-bold transition shadow-2xs"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{t.common.back}</span>
+            </button>
+          )}
+          <span>{lang === 'ta' ? 'முகப்பு' : lang === 'hi' ? 'होम' : 'Home'}</span>
+          <span>/</span>
+          <span className="text-blue-700 font-bold">{t.nav.budgetCalculator}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-[11px] text-stone-500">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>{lang === 'ta' ? 'பாதுகாப்பான உள்ளூர் கணக்கீடு' : 'Secure Local Calculation'}</span>
+        </div>
+      </div>
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 rounded-3xl p-6 sm:p-8 text-white shadow-md">
         <div className="max-w-2xl">
@@ -300,17 +334,28 @@ export const BudgetCalculatorView: React.FC<BudgetCalculatorViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-stone-700 whitespace-nowrap">
-              {lang === 'ta' ? 'கிடைக்கக்கூடிய மூலதனம்:' : lang === 'hi' ? 'कुल बजट सीमा:' : 'Total Available Budget:'}
-            </label>
-            <input
-              type="number"
-              step="1000"
-              value={totalBudgetLimit}
-              onChange={(e) => setTotalBudgetLimit(Math.max(1000, Number(e.target.value)))}
-              className="w-32 px-3 py-1.5 bg-stone-50 border border-stone-300 rounded-xl text-xs font-black text-indigo-900 focus:ring-2 focus:ring-indigo-500"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsRawMaterialModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-xl text-xs font-bold transition shadow-2xs"
+            >
+              <Store className="w-3.5 h-3.5 text-teal-600" />
+              <span>{lang === 'ta' ? 'மூலப்பொருள் சந்தை & விலை ஒப்பீடு' : 'Find Raw Materials / Compare Quotes'}</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-stone-700 whitespace-nowrap">
+                {lang === 'ta' ? 'கிடைக்கக்கூடிய மூலதனம்:' : lang === 'hi' ? 'कुल बजट सीमा:' : 'Total Available Budget:'}
+              </label>
+              <input
+                type="number"
+                step="1000"
+                value={totalBudgetLimit}
+                onChange={(e) => setTotalBudgetLimit(Math.max(1000, Number(e.target.value)))}
+                className="w-32 px-3 py-1.5 bg-stone-50 border border-stone-300 rounded-xl text-xs font-black text-indigo-900 focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           </div>
         </div>
 
@@ -431,7 +476,15 @@ export const BudgetCalculatorView: React.FC<BudgetCalculatorViewProps> = ({
                   <tr key={item.id} className="hover:bg-stone-50/60 transition">
                     <td className="py-2.5 px-3 font-bold text-stone-900">
                       <div>{item.itemName}</div>
-                      {item.notes && <span className="text-[10px] text-stone-400 font-normal">{item.notes}</span>}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {item.notes && <span className="text-[10px] text-stone-400 font-normal">{item.notes}</span>}
+                        {item.sourceHubOrShop && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 rounded font-semibold flex items-center gap-0.5">
+                            <Store className="w-2.5 h-2.5 text-teal-600" />
+                            <span>{item.sourceHubOrShop}</span>
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 px-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-700">
@@ -711,6 +764,13 @@ export const BudgetCalculatorView: React.FC<BudgetCalculatorViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Local Raw Material Finder Modal */}
+      <RawMaterialFinderModal
+        lang={lang}
+        isOpen={isRawMaterialModalOpen}
+        onClose={() => setIsRawMaterialModalOpen(false)}
+      />
     </div>
   );
 };

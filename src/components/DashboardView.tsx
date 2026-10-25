@@ -104,7 +104,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           : '₹1000 Monthly basic aid, free sewing machines, SHG grants with verification dates',
       icon: <FileCheck2 className="w-6 h-6 text-rose-600" />,
       color: 'from-rose-50 to-pink-50 border-rose-200 text-rose-950',
-      badge: lang === 'ta' ? '12+ திட்டங்கள்' : lang === 'hi' ? '12+ योजनाएं' : '12+ Schemes',
+      badge: lang === 'ta' ? '40 சரிபார்க்கப்பட்ட திட்டங்கள்' : lang === 'hi' ? '40 सत्यापित योजनाएं' : '40 Verified Schemes',
       badgeColor: 'bg-rose-100 text-rose-800',
     },
     {
@@ -179,16 +179,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     },
     {
       tab: 'community' as ActiveTab,
-      title: lang === 'ta' ? 'தோழிகள் வட்டம்' : lang === 'hi' ? 'सखी मंडल' : 'Sisterhood Circle',
+      title: lang === 'ta' ? 'தோழிகள் வட்டம் (சகோதரத்துவ குழு)' : lang === 'hi' ? 'सहेली मंडल (समस्या समाधान)' : 'Sisterhood Circles (Problem-Based)',
       subtitle:
         lang === 'ta'
-          ? 'கிராமப்புற பெண்களின் வெற்றிக் கதைகள், சந்தேகங்கள் & பாதுகாப்பு நெறிகள்'
+          ? 'புதுச்சேரி & தமிழ்நாடு பகுதிக்கான பிரச்சனை வட்டங்கள், கூட்டு தீர்வுகள் & உறுதிமொழி'
           : lang === 'hi'
-          ? 'प्रेरक कहानियां, मार्गदर्शन, और समूह सुरक्षा नियम'
-          : 'Inspiring stories, helpful advice, interest groups & safety moderation',
+          ? 'पुदुचेरी और तमिलनाडु सहायता समूह, सहकर्मी समाधान एवं सामूहिक पहल'
+          : 'Puducherry & Tamil Nadu problem circles, peer guidance & collective action',
       icon: <Users className="w-6 h-6 text-pink-600" />,
       color: 'from-pink-50 to-rose-50 border-pink-200 text-pink-950',
-      badge: lang === 'ta' ? 'பாதுகாப்பான சமூகம்' : lang === 'hi' ? 'सुरक्षित मंच' : 'Safe Circle',
+      badge: lang === 'ta' ? 'கூட்டு நடவடிக்கை' : lang === 'hi' ? 'सामूहिक पहल' : 'Collective Action',
       badgeColor: 'bg-pink-100 text-pink-800',
     },
     {

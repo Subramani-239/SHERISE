@@ -511,5 +511,21 @@ export function matchVoiceCommand(input: string): string | undefined {
     return 'privacy';
   }
 
+  // 13. Orders Match
+  if (
+    combined.includes('order') ||
+    combined.includes('orders') ||
+    combined.includes('ஆர்டர்') ||
+    combined.includes('ஆர்டர்கள்') ||
+    combined.includes('முன்பதிவு') ||
+    combined.includes('விற்பனை') ||
+    combined.includes('ऑर्डर') ||
+    combined.includes('ऑर्डर्स') ||
+    combined.includes('खरीदारी') ||
+    combined.includes('बिक्री')
+  ) {
+    return 'orders';
+  }
+
   return undefined;
 }

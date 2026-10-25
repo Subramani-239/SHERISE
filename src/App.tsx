@@ -483,11 +483,19 @@ export default function App() {
         )}
 
         {activeTab === 'business-generator' && (
-          <BusinessIdeaGeneratorView lang={lang} />
+          <BusinessIdeaGeneratorView
+            lang={lang}
+            onNavigate={handleNavigate}
+            onNavigateBack={handleNavigateBack}
+          />
         )}
 
         {activeTab === 'budget-calculator' && (
-          <BudgetCalculatorView lang={lang} />
+          <BudgetCalculatorView
+            lang={lang}
+            onNavigate={handleNavigate}
+            onNavigateBack={handleNavigateBack}
+          />
         )}
 
         {activeTab === 'community' && (

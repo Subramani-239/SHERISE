@@ -13,6 +13,7 @@ export type ActiveTab =
   | 'skills-learning'
   | 'business-generator'
   | 'budget-calculator'
+  | 'orders'
   | 'emergency-help'
   | 'chat-call'
   | 'community'
@@ -184,6 +185,114 @@ export interface BudgetItemPlan {
   quantity: number;
   estimatedUnitCost: number;
   notes?: string;
+  sourceHubOrShop?: string;
+}
+
+export interface LocationQuery {
+  stateOrUt: 'puducherry' | 'tamil_nadu' | 'other';
+  district: string;
+  town: string;
+  locality: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  isGpsDetected?: boolean;
+}
+
+export interface BusinessIdeaInput {
+  location: LocationQuery;
+  currentProfession: string;
+  skills: string[];
+  budgetAmount: number;
+  workingHours: '1-2' | '2-3' | '3-4' | 'full_day' | 'flexible';
+  preferredCategory: string;
+  interests: string[];
+}
+
+export interface LocationBusinessIdea {
+  id: string;
+  title: string;
+  titleTa: string;
+  titleHi: string;
+  category: 'food_catering' | 'tailoring_garments' | 'agriculture_poultry' | 'handicrafts_eco' | 'beauty_wellness' | 'digital_retail';
+  suitableForDistricts: string[]; // e.g. ['Puducherry', 'Karaikal', 'Madurai', 'all']
+  suitabilityReason: string;
+  suitabilityReasonTa: string;
+  suitabilityReasonHi: string;
+  customerDemandFactors: string[];
+  customerDemandFactorsTa: string[];
+  customerDemandFactorsHi: string[];
+  competitionAnalysis: string;
+  competitionAnalysisTa: string;
+  competitionAnalysisHi: string;
+  estimatedStartupCost: number;
+  expectedMonthlyProfit: string;
+  expectedMonthlyProfitTa: string;
+  dailyTimeRequired: string;
+  dailyTimeRequiredTa: string;
+  starterShoppingList: BudgetItemPlan[];
+  risks: string[];
+  risksTa: string[];
+  firstSteps: string[];
+  firstStepsTa: string[];
+  recommendedWholesaleHubs: string[];
+  disclaimerNote: string;
+  disclaimerNoteTa: string;
+}
+
+export interface WholesaleHub {
+  id: string;
+  name: string;
+  nameTa: string;
+  nameHi: string;
+  region: 'puducherry' | 'tamil_nadu' | 'all';
+  district: string;
+  districtTa: string;
+  town: string;
+  address: string;
+  addressTa: string;
+  categoriesHandled: string[];
+  benchmarkMaterials: {
+    materialName: string;
+    materialNameTa: string;
+    benchmarkWholesaleRate: string;
+    minLotSize: string;
+  }[];
+  verifiedDate: string;
+  officialSourceOrNote: string;
+  contactOrLocationTip: string;
+  contactOrLocationTipTa: string;
+}
+
+export interface MaterialQuotation {
+  id: string;
+  shopName: string;
+  shopAddressOrPhone: string;
+  materialName: string;
+  quantity: number;
+  unit: string;
+  quotedPricePerUnit: number;
+  transportCost: number;
+  notes?: string;
+  paymentTerms?: 'cash' | 'credit' | 'upi_spot';
+  isUserEntered: boolean;
+}
+
+export interface QuotationComparisonResult {
+  bestOverallQuoteId: string;
+  quotes: {
+    id: string;
+    shopName: string;
+    materialCost: number;
+    transportCost: number;
+    totalLandedCost: number;
+    effectiveUnitCost: number;
+    isBestDeal: boolean;
+    savingsVsHighest: number;
+  }[];
+  summaryAdvice: string;
+  summaryAdviceTa: string;
 }
 
 export interface CommunityPost {
@@ -221,6 +330,69 @@ export interface CommunityCircleGroup {
   descriptionHi: string;
   icon: string;
   memberCount: number;
+}
+
+export type CircleProblemCategory = 
+  | 'education_restart'
+  | 'business_capital'
+  | 'job_orders'
+  | 'legal_family'
+  | 'health_nutrition'
+  | 'unorganized_labor';
+
+export interface ProblemCircle {
+  id: string;
+  name: string;
+  nameTa: string;
+  nameHi: string;
+  category: CircleProblemCategory;
+  region: 'puducherry' | 'tamil_nadu' | 'all';
+  district: string;
+  districtTa: string;
+  districtHi: string;
+  isPrivate: boolean; // private support circle requires request to join
+  description: string;
+  descriptionTa: string;
+  descriptionHi: string;
+  icon: string;
+  activeProblem: string;
+  activeProblemTa: string;
+  activeProblemHi: string;
+  memberCount: number;
+  solvedCount: number;
+  tags: string[];
+}
+
+export interface ProblemDiscussionThread {
+  id: string;
+  circleId: string;
+  authorId?: string;
+  authorAlias: string;
+  isAnonymous: boolean;
+  authorLocation: string;
+  problemTitle: string;
+  problemDescription: string;
+  category: CircleProblemCategory;
+  timestamp: string;
+  upvotes: number;
+  isUpvoted?: boolean;
+  solutions: {
+    id: string;
+    authorAlias: string;
+    isAnonymous: boolean;
+    solutionText: string;
+    isVerifiedByMentor?: boolean;
+    timestamp: string;
+    helpfulVotes: number;
+    isHelpful?: boolean;
+  }[];
+  collectiveAction?: {
+    actionTitle: string;
+    actionDescription: string;
+    targetAuthority: string;
+    pledgedCount: number;
+    hasUserPledged?: boolean;
+  };
 }
 
 export interface PrivacyConfig {
@@ -323,4 +495,77 @@ export interface UserCourseProgress {
   courseId: string;
   completedLessonIds: string[];
   completedAt?: string;
+}
+
+export type OrderStatus = 
+  | 'pending_seller_approval'   // Customer placed request; waiting for seller response
+  | 'accepted_in_preparation'   // Seller accepted; currently preparing
+  | 'ready_for_pickup'          // Item prepared; ready for customer in-person collection
+  | 'out_for_delivery'          // Seller or delivery agent is en route
+  | 'completed'                 // Item received & settled
+  | 'declined';                 // Seller declined with a polite reason
+
+export type FulfillmentMethod = 
+  | 'customer_pickup'           // Customer collects from seller home/stall
+  | 'seller_delivery'           // Seller brings it directly (local walking/two-wheeler)
+  | 'external_delivery';        // 3rd party auto/courier delivery arranged
+
+export type ListingType = 'product' | 'service';
+
+export interface ProductListing {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  sellerPhone?: string;
+  sellerLocation: string; // e.g. "Lawspet, Puducherry" or "Kamarajar Salai, Karaikal"
+  title: string;
+  titleTa: string;
+  titleHi: string;
+  description: string;
+  descriptionTa: string;
+  descriptionHi: string;
+  type: ListingType;
+  category: 'food' | 'tailoring' | 'handicraft' | 'pooja_flowers' | 'beauty' | 'household';
+  price: number; // in INR
+  unit: string; // e.g. "kg", "packet", "piece", "hour", "dress"
+  unitTa: string;
+  unitHi: string;
+  minOrderQuantity: number;
+  preparationTime: string; // e.g. "Same-day (2 hrs)" or "1 day in advance"
+  fulfillmentOptions: FulfillmentMethod[];
+  rating?: number;
+  reviewsCount?: number;
+  isAvailable: boolean;
+  imageIcon: string;
+}
+
+export interface OrderRequest {
+  id: string; // e.g. "ORD-2026-7841"
+  listingId: string;
+  listingTitle: string;
+  sellerId: string;
+  sellerName: string;
+  sellerLocation: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  customerLocation: string;
+  quantity: number;
+  unitPrice: number;
+  deliveryFee: number;
+  totalPrice: number;
+  fulfillmentMethod: FulfillmentMethod;
+  deliveryAddressOrPickupNotes: string;
+  customRequirements?: string;
+  status: OrderStatus;
+  statusHistory: {
+    status: OrderStatus;
+    timestamp: string;
+    note?: string;
+  }[];
+  declineReason?: string;
+  deliveryNotes?: string;
+  paymentMethod: 'cash_on_delivery' | 'direct_upi_at_pickup';
+  placedAt: string;
+  updatedAt: string;
 }
